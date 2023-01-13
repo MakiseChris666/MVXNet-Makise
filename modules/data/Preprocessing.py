@@ -1,14 +1,39 @@
 import numpy as np
 import torch
 from modules.Extension import cpp
+from modules import utils
 from typing import Sequence
 
-def crop(pcd, range):
+def crop(pcd: np.ndarray, range: Sequence[float]):
     low = np.array(range[0:3])
     high = np.array(range[3:6])
     roi = pcd[:, :3]
     f = np.all((low <= roi) & (roi < high), axis = 1)
     return pcd[f]
+
+def cropToSight(pcd: np.ndarray, calib: dict, imsize: Sequence[int]):
+    """
+    Notice that imsize is in (w, h)
+    @param pcd:
+    @param calib:
+    @param imsize:
+    @return:
+    """
+    imsize = np.array(imsize)
+    points = pcd.T[:3]
+    points = np.concatenate([points, np.ones((1, points.shape[1]))], axis = 0)
+    points = calib['R0_rect'] @ calib['Tr_velo_to_cam'] @ points
+    f = points[2] > 0
+    pcd = pcd[f]
+    points = points[:, f]  # 去掉深度小于0的点（在摄像机后面）
+    points = calib['P2'] @ points
+    points[:2] = points[:2] / points[2]
+    points = points[:2].T
+    f = (points >= 0).all(axis = 1) & (points < imsize).all(axis = 1)
+    pcd = pcd[f]
+    # img = utils.lidar2Img(pcd, calib, True)
+    # print(np.max(img, axis = 0))
+    return pcd
 
 def group(pcd: np.ndarray, range: Sequence[float], size, samplesPerVoxel: int):
     np.random.shuffle(pcd)
@@ -18,9 +43,6 @@ def group(pcd: np.ndarray, range: Sequence[float], size, samplesPerVoxel: int):
     voxel, uidx, vcnt = cpp._group(pcd, idx, samplesPerVoxel) # noqa
     center = voxel[..., :3].sum(axis = 1) / vcnt[:, None]
     voxel[..., 3:6] = voxel[..., :3] - center[:, None, :]
-    zero = (voxel[..., :3] == 0).all(axis = 2)
-    zero = np.where(zero)
-    voxel[zero[0], zero[1], 3:6] = 0
     return voxel, np.array(uidx).T
 
 def group_(pcd, range, size, samplesPerVoxel):

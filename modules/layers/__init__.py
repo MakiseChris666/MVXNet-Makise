@@ -1,1 +1,1 @@
-from Blocks import *
+from .Blocks import *

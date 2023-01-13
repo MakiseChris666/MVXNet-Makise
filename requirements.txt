@@ -3,3 +3,5 @@ pandas
 torch>=1.11.0
 torchvision
 shapely
+opencv-python>=4.5.5
+ninja

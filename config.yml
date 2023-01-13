@@ -10,10 +10,14 @@ voxelshape:
   - 352
   - 400
   - 10
-carsize:
+carsize: # it's a temp param, the model only supports detect cars currenly
   - 3.9
   - 1.6
   - 1.56
-batchsize: 1
-samplenum: 25
+batchsize: 1 # this param doesn't work because the model currenly supports only batchsize=1
+bnaffine: False # whether to use trainable BN layers
+samplenum: 6
 numthreads: 16
+imsize:
+  - 370
+  - 1224

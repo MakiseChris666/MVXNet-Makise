@@ -13,27 +13,33 @@ class ImageFeatureExtractor(nn.Module):
         self.__fasterRCNN.train(False)
 
     def forward(self, x):
-        x = self.__fasterRCNN.transform(x)
-        features = self.__fasterRCNN.backbone(x)
-        features = (features['0'], features['1'], features['2'])
+        x, _ = self.__fasterRCNN.transform(x)
+        features = self.__fasterRCNN.backbone(x.tensors)
+        features = [features['0'], features['1'], features['2']]
         return features
 
-def featureMaping(voxels, features, calibs, imgsize):
+def featureMaping(voxels, features, calibs, imsize):
     # input: voxel = batch * (N, T, C)
     # features = mapnum * (batch, C, H, W)
     # calibs = batch * {%calibration%}
     # assume that all images are of the same size
-    # imgsize in (h, w)
+    # imsize in (h, w)
     # return batch * (N, T, C * mapnum)
-
-    if not isinstance(imgsize, torch.Tensor):
-        imgsize = torch.Tensor(imgsize)
-    features = features.transpose(0, 1) # transpose into (batch, mapnum, ...)
+    """
+    Map image features to corresponding voxels \n
+    BTW, this function will set zero voxel points(i.e. x=y=z=0) to all zero.
+    This functionality is implemented here for convenience
+    @param voxels: batch * (N, T, C)
+    @param features: mapnum * (batch, C1, H, W)
+    @param calibs: batch * calib_dict
+    @param imsize: (h, w), note that it show be the same type as voxels and features
+    @return: batch * (N, T, C * mapnum)
+    """
 
     regionSizes = []
     for feature in features:
-        fhw = feature.shape[-2:]
-        regionSize = fhw / imgsize
+        fhw = torch.Tensor([*feature.shape[-2:]]).to(imsize.device)
+        regionSize = imsize / fhw
         regionSizes.append(regionSize)
 
     for i in range(len(features)):
@@ -43,14 +49,19 @@ def featureMaping(voxels, features, calibs, imgsize):
     for i, (v, c) in enumerate(zip(voxels, calibs)):
         origshape = v.shape[:-1]
         xyz = v[..., :3].reshape((-1, 3))
-        proj = utils.lidar2Img(xyz, c)
+        zero = torch.all(xyz == 0, dim = 1)
+        proj = utils.lidar2Img(xyz, c, True)
+        proj = proj[:, [1, 0]]
+        proj[zero] = 0
         imageFeatures = []
+        zero = zero.reshape(origshape)
+        v[zero] = 0
 
         for feature, regionSize in zip(features, regionSizes):
             index = proj / regionSize
-            index = index.floor()
-            xi = 1 - proj[:, 0] + index[:, 0]   #
-            yi = 1 - proj[:, 1] + index[:, 1]   #
+            index = index.long()
+            xi = proj[:, 0] - index[:, 0]       #
+            yi = proj[:, 1] - index[:, 1]       #
             xi, yi = xi[None, :], yi[None, :]   # These are pre-calculated to
             xi_, yi_ = 1 - xi, 1 - yi           # reduce calculation times
             x, y = index[:, 0], index[:, 1]     #
@@ -64,6 +75,7 @@ def featureMaping(voxels, features, calibs, imgsize):
 
         imageFeatures = torch.concat(imageFeatures, dim = 0).T
         imageFeatures = imageFeatures.reshape(origshape + (imageFeatures.shape[-1], ))
+        imageFeatures[zero] = 0
         res.append(imageFeatures)
     return res
 

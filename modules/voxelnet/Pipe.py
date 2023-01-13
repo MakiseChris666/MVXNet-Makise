@@ -21,7 +21,7 @@ class SVFE(nn.Module):
 
     def __init__(self, sampleNum = 35):
         super().__init__()
-        self.vfe1 = VFE(7, 16, sampleNum)
+        self.vfe1 = VFE(7 + 16, 16, sampleNum)
         self.vfe2 = VFE(32, 64, sampleNum)
 
     def forward(self, x):

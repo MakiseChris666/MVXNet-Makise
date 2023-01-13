@@ -15,7 +15,7 @@ def getRotationMatrices(r: torch.Tensor):
 def bbox3d2bev(bbox3ds: torch.Tensor) -> torch.Tensor:
     """
     Convert 3d bboxes to bev(in format of corner points)
-    @param bbox3ds: (..., 7 + C) in xyzlwhr format, '...' can be none in case of a single box
+    @param bbox3ds: (..., 7) in xyzlwhr format, '...' can be none in case of a single box
     @return: bev in (..., 4, 2)
     """
     assert bbox3ds.shape[-1] >= 7
@@ -94,17 +94,10 @@ def getPolygons(bboxes):
 def classifyAnchors(gts: torch.Tensor, gtCenters: torch.Tensor, anchors: torch.Tensor,
                     velorange: Sequence[float], negThr: float, posThr: float)\
                     -> Tuple[index3d, index3d, torch.Tensor]:
-    # pos = torch.zeros(anchors.shape[:3], dtype = torch.bool)
-    # neg = torch.zeros(anchors.shape[:3], dtype = torch.bool)
-    # gi = torch.zeros_like(pos, dtype = torch.int64)
     l = (velorange[3] - velorange[0]) / anchors.shape[0]
     w = (velorange[4] - velorange[1]) / anchors.shape[1]
     nls = ((gtCenters[:, 0] - velorange[0] - l / 2) / l + 0.5).long()
     nws = ((gtCenters[:, 1] - velorange[1] - w / 2) / w + 0.5).long()
-    # cpp._classifyAnchors2(gts, anchors, nls, nws, negThr, posThr, pos, neg, gi) # noqa
-    # pi = torch.where(pos)
-    # ni = torch.where(neg)
-    # gi = gi[pi]
     pi, ni, gi = cpp._classifyAnchors(gts, anchors, nls, nws, negThr, posThr) # noqa
     return pi, ni, gi
 

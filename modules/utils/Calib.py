@@ -1,31 +1,28 @@
 import numpy as np
+from typing import Union
+import torch
 
-def lidar2CamP2(velo: np.ndarray, calib: dict, discardUnderZero = True) -> np.ndarray:
+def lidar2Img(pcd: Union[np.ndarray, torch.Tensor], calib: dict, uncheck = False):
     """
-    Transfer point cloud from LiDAR coordinates to camera coordinates
-    @param velo: Point cloud in (4, N)
-    @param calib: Calibration, the matrix in it should be preprocessed to (4, 4)
-    @param discardUnderZero: Whether to discard the points with z coordinate under zero, i.e. behind the camera
-    @return: Point cloud in camera coordinates
-    """
-    assert velo.ndim == 2, 'Point cloud should be in (3, N)'
-    velo = calib['R0_rect'] @ calib['Tr_velo_to_cam'] @ velo
-    if discardUnderZero:
-        velo = velo[:, velo[2] >= 0]  # 去掉深度小于0的点（在摄像机后面）
-    velo = calib['P2'] @ velo
-    return velo
-
-def lidar2Img(points, calib: dict):
-    """
-    Project points to image
-    @param points: (N, 3)
-    @param calib: Calibration matrices
+    Project points to image \n
+    Note that pcd and calib should be the same type in same device
+    @param pcd: (N, 3 + C)
+    @param calib: Calibration matrices, preprocessed to (4, 4)
+    @param uncheck: If True, the function will not discard the points behind the camera
     @return: (N, 2) in (width coor, height coor)
     """
-    assert points.ndim == 2, 'Point cloud should be in (N, 3)'
-    points = points.T
+    assert pcd.ndim == 2, 'Point cloud should be in (N, 3 + C)'
+    if isinstance(pcd, np.ndarray):
+        points = np.empty((4, pcd.shape[0]), dtype = 'float32')
+    elif isinstance(pcd, torch.Tensor):
+        points = torch.empty((4, pcd.shape[0]), dtype = torch.float32, device = pcd.device)
+    else:
+        raise TypeError('pcd should be ndarray or Tensor')
+    points[:3] = pcd[:, :3].T
+    points[3] = 1
     points = calib['R0_rect'] @ calib['Tr_velo_to_cam'] @ points
-    points = points[:, points[2] >= 0]  # 去掉深度小于0的点（在摄像机后面）
+    if not uncheck:
+        points = points[:, points[2] > 0]  # 去掉深度小于0的点（在摄像机后面）
     points = calib['P2'] @ points
     points[:2] = points[:2] / points[2]
     return points[:2].T
