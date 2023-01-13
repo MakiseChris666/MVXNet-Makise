@@ -15,6 +15,10 @@ if len(sys.argv) > 1 and sys.argv[1] != '#':
     dataroot = sys.argv[1]
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
+if len(sys.argv) > 2 and sys.argv[2] != '#':
+    infoRoot = sys.argv[2]
+    trainInfoPath = os.path.join(infoRoot, 'train.txt')
+    testInfoPath = os.path.join(infoRoot, 'test.txt')
 
 if cfg.numthreads != -1:
     torch.set_num_threads(cfg.numthreads)
@@ -49,8 +53,8 @@ def train():
     backwardTime = 0
     allTime = 0
 
-    if len(sys.argv) > 2:
-        iterations = int(sys.argv[2])
+    if len(sys.argv) > 3:
+        iterations = int(sys.argv[3])
     else:
         iterations = 10
 
@@ -58,8 +62,8 @@ def train():
         os.mkdir('./checkpoints')
 
     lastiter = 0
-    if len(sys.argv) > 3:
-        lastiter = int(sys.argv[3])
+    if len(sys.argv) > 4:
+        lastiter = int(sys.argv[4])
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
 

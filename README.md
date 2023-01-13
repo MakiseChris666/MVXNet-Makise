@@ -10,12 +10,12 @@ is implemented by myself, you can check the model [here](https://github.com/Maki
 The VoxelNet used in this project is not the same as that.
 
 To train the model you can use: 
-> python train.py &lt;dataroot&gt; &lt;iterations&gt; &lt;lastiteration&gt;
+> python train.py &lt;dataroot&gt; &lt;inforoot> &lt;iterations&gt; &lt;lastiteration&gt;
 
 and the dataset should arranged as:
 
 &lt;dataroot&gt; \
-|--ImageSets \
+|--ImageSets # if &lt;inforoot&gt; is specified, this folder's content should be in inforoot \
 &emsp;|--train.txt # this .txt contains the samples' number to be in training set \
 &emsp;|--val.txt # to be in validation set \
 |--training \
