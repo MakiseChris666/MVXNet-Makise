@@ -46,9 +46,7 @@ int lineCross(Point a, Point b, Point c, Point d, Point& p) {
     p.y = (c.y * s2 - d.y * s1) / (s2 - s1);
     return 1;
 }
-//多边形切割
-//用直线ab切割多边形p，切割后的在向量(a,b)的左侧，并原地保存切割结果
-//如果退化为一个点，也会返回去,此时n为1
+
 void polygon_cut(Point* p, int& n, Point a, Point b) {
     static Point pp[maxn];
     int m = 0; p[n] = p[0];
@@ -63,13 +61,12 @@ void polygon_cut(Point* p, int& n, Point a, Point b) {
             p[n++] = pp[i];
     while (n > 1 && p[n - 1] == p[0])n--;
 }
-//---------------华丽的分隔线-----------------//
-//返回三角形oab和三角形ocd的有向交面积,o是原点//
+
 float intersectArea(Point a, Point b, Point c, Point d) {
     Point o(0, 0);
     int s1 = sig(cross(o, a, b));
     int s2 = sig(cross(o, c, d));
-    if (s1 == 0 || s2 == 0)return 0.0;//退化，面积为0
+    if (s1 == 0 || s2 == 0)return 0.0;
     if (s1 == -1) swap(a, b);
     if (s2 == -1) swap(c, d);
     Point p[10] = { o,a,b };
@@ -80,7 +77,7 @@ float intersectArea(Point a, Point b, Point c, Point d) {
     float res = fabs(area(p, n));
     if (s1 * s2 == -1) res = -res; return res;
 }
-//求两多边形的交面积
+
 float intersectArea(Point* ps1, int n1, Point* ps2, int n2) {
     if (area(ps1, n1) < 0) reverse(ps1, ps1 + n1);
     if (area(ps2, n2) < 0) reverse(ps2, ps2 + n2);
@@ -92,7 +89,7 @@ float intersectArea(Point* ps1, int n1, Point* ps2, int n2) {
             res += intersectArea(ps1[i], ps1[i + 1], ps2[j], ps2[j + 1]);
         }
     }
-    return res;//assumeresispositive!
+    return res;
 }
 
 auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long long> nls, array_t<long long> nws,

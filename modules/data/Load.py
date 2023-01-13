@@ -11,7 +11,7 @@ import cv2 as cv
 dataroot = '../mmdetection3d-master/data/kitti'
 if len(sys.argv) > 1 and sys.argv[1] != '#':
     dataroot = sys.argv[1]
-veloroot = os.path.join(dataroot, 'training/velodyne_reduced')
+veloroot = os.path.join(dataroot, 'training/velodyne')
 labelroot = os.path.join(dataroot, 'training/label_2')
 calibroot = os.path.join(dataroot, 'training/calib')
 imroot = os.path.join(dataroot, 'training/image_2')
