@@ -19,7 +19,9 @@ def cropToSight(pcd: np.ndarray, calib: dict, imsize: Sequence[int]):
     @param imsize:
     @return:
     """
-    imsize = np.array(imsize)
+    # it seems that there exists minor difference between the calculation result from numpy and pytorch
+    # so to avoid such inconsistency, the image size is subtracted by a small number
+    imsize = np.array(imsize) - 1e-3
     points = pcd.T[:3]
     points = np.concatenate([points, np.ones((1, points.shape[1]))], axis = 0)
     points = calib['R0_rect'] @ calib['Tr_velo_to_cam'] @ points
@@ -29,10 +31,8 @@ def cropToSight(pcd: np.ndarray, calib: dict, imsize: Sequence[int]):
     points = calib['P2'] @ points
     points[:2] = points[:2] / points[2]
     points = points[:2].T
-    f = (points >= 0).all(axis = 1) & (points < imsize).all(axis = 1)
+    f = (points >= 0).all(axis = 1) & (points < imsize).all(axis = 1) # noqa
     pcd = pcd[f]
-    # img = utils.lidar2Img(pcd, calib, True)
-    # print(np.max(img, axis = 0))
     return pcd
 
 def group(pcd: np.ndarray, range: Sequence[float], size, samplesPerVoxel: int):
@@ -68,9 +68,6 @@ def group_(pcd, range, size, samplesPerVoxel):
         vcnt[i] += 1
     center = voxel[..., :3].sum(axis = 1) / vcnt[:, None]
     voxel[..., 3:6] = voxel[..., :3] - center[:, None, :]
-    zero = (voxel[..., :3] == 0).all(axis = 2)
-    zero = np.where(zero)
-    voxel[zero[0], zero[1], 3:6] = 0
     return voxel, uidx
 
 def createAnchors(l, w, range, size):

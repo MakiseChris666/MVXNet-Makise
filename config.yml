@@ -16,6 +16,7 @@ carsize: # it's a temp param, the model only supports detect cars currenly
   - 1.56
 batchsize: 1 # this param doesn't work because the model currenly supports only batchsize=1
 bnaffine: False # whether to use trainable BN layers
+bntrack: False # whether to update var and mean in BN
 samplenum: 6
 numthreads: 16
 imsize:

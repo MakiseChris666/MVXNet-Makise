@@ -11,7 +11,7 @@ import cv2 as cv
 dataroot = '../mmdetection3d-master/data/kitti'
 if len(sys.argv) > 1 and sys.argv[1] != '#':
     dataroot = sys.argv[1]
-veloroot = os.path.join(dataroot, 'training/velodyne')
+veloroot = os.path.join(dataroot, 'training/velodyne_croped')
 labelroot = os.path.join(dataroot, 'training/label_2')
 calibroot = os.path.join(dataroot, 'training/calib')
 imroot = os.path.join(dataroot, 'training/image_2')
@@ -20,13 +20,15 @@ rangeMin = torch.Tensor(cfg.velorange[:3])
 rangeMax = torch.Tensor(cfg.velorange[3:])
 imsize = cfg.imsize[::-1]
 
-def createDataset(splitSet: List[str]) -> \
+def createDataset(splitSet: List[str], needCrop = False) -> \
         Tuple[List[Tuple[np.ndarray, np.ndarray]], List[Tuple[torch.Tensor, torch.Tensor]], List[Dict[str, torch.Tensor]]]:
     """
     Read KITTI data from root.
     @param splitSet: Names of files to read. e.g. ['000000', '000001', ...]
-    @return: (x, y), x is a list of (point cloud, image), y is a list of (bbox, bev of bbox)
-            ((None, None) if there's no gtbox), bbox in LiDAR coordinates.
+    @param needCrop: Whether to crop point clouds, set to True if directly read from the raw data; Default False
+    @return: (x, y, calibs), x is a list of (point cloud, image); y is a list of (bbox, bev of bbox)
+            ((None, None) if there's no gtbox), bbox in LiDAR coordinates; calibs is a list of dict containing the
+            calibration matrices
     """
     x, y = [], []
     calibs = []
@@ -35,7 +37,8 @@ def createDataset(splitSet: List[str]) -> \
         print(f'\rProcessing: {i + 1}/{sum}', end = '')
         path = os.path.join(veloroot, s + '.bin')
         velo = np.fromfile(path, dtype = 'float32').reshape((-1, 4))
-        velo = pre.crop(velo, cfg.velorange)
+        if needCrop:
+            velo = pre.crop(velo, cfg.velorange)
 
         path = os.path.join(imroot, s + '.png')
         img = cv.imread(path)
@@ -63,7 +66,8 @@ def createDataset(splitSet: List[str]) -> \
             r0[3, 3] = 1
             calib[l[0][:-1]] = r0
 
-        velo = pre.cropToSight(velo, calib, imsize)
+        if needCrop:
+            velo = pre.cropToSight(velo, calib, imsize)
         x.append((velo, img))
 
         for k in calib.keys():

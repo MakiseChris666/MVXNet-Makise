@@ -1,3 +1,4 @@
+import random
 from modules import Config as cfg
 import sys
 import torch
@@ -15,10 +16,6 @@ if len(sys.argv) > 1 and sys.argv[1] != '#':
     dataroot = sys.argv[1]
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
-if len(sys.argv) > 2 and sys.argv[2] != '#':
-    infoRoot = sys.argv[2]
-    trainInfoPath = os.path.join(infoRoot, 'train.txt')
-    testInfoPath = os.path.join(infoRoot, 'test.txt')
 
 if cfg.numthreads != -1:
     torch.set_num_threads(cfg.numthreads)
@@ -29,6 +26,7 @@ def train():
         trainSet = f.read().splitlines()
     # with open(testInfoPath, 'r') as f:
     #     testSet = f.read().splitlines()
+    random.shuffle(trainSet)
 
     trainX, trainY, trainCalibs = load.createDataset(trainSet)
     # testX, testY, testCalibs = load.createDataset(testSet)
@@ -38,7 +36,7 @@ def train():
     model = MVXNet()
     anchorBevs = bbox3d2bev(anchors.reshape(anchors.shape[:2] + (-1, 7)))
     criterion = VoxelLoss()
-    opt = torch.optim.Adam(model.parameters(), lr = 0.001)
+    opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.001)
     # torch.autograd.set_detect_anomaly(True)
 
     model = model.to(device)
@@ -53,8 +51,8 @@ def train():
     backwardTime = 0
     allTime = 0
 
-    if len(sys.argv) > 3:
-        iterations = int(sys.argv[3])
+    if len(sys.argv) > 2:
+        iterations = int(sys.argv[2])
     else:
         iterations = 10
 
@@ -62,12 +60,12 @@ def train():
         os.mkdir('./checkpoints')
 
     lastiter = 0
-    if len(sys.argv) > 4:
-        lastiter = int(sys.argv[4])
+    if len(sys.argv) > 3:
+        lastiter = int(sys.argv[3])
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
 
-    # calibs will be used only in forwarding, so we preprocess it into the config device
+    # calibs will be used only in forwarding, so we preprocess it into the target device
     for c in trainCalibs:
         for k in c.keys():
             c[k] = c[k].to(device)
@@ -88,6 +86,13 @@ def train():
             opt.zero_grad()
             st = time.perf_counter()
             voxel = torch.Tensor(voxel).to(device)
+
+            # points = voxel[..., :3].reshape((-1, 3))
+            # zero = torch.all(points == 0, dim = 1)
+            # proj = utils.lidar2Img(voxel[..., :3].reshape((-1, 3)), calib, True)
+            # proj[zero] = 0
+            # assert torch.all(torch.max(proj, dim = 0)[0] < imsize[[1, 0]])
+
             idx = torch.LongTensor(idx).to(device)
             img = torch.Tensor(x[1]).to(device).permute(2, 0, 1) / 255
             img = img[None, ...]

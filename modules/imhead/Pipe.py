@@ -11,6 +11,8 @@ class ImageFeatureExtractor(nn.Module):
         super().__init__()
         self.__fasterRCNN = fasterrcnn_resnet50_fpn(True)
         self.__fasterRCNN.train(False)
+        for p in self.__fasterRCNN.parameters():
+            p.requires_grad = False
 
     def forward(self, x):
         x, _ = self.__fasterRCNN.transform(x)
@@ -67,6 +69,7 @@ def featureMaping(voxels, features, calibs, imsize):
             x, y = index[:, 0], index[:, 1]     #
             xplus1 = index[:, 0] + 1            #
             yplus1 = index[:, 1] + 1            #
+            assert torch.max(xplus1) < feature.shape[-2] and torch.max(yplus1) < feature.shape[-1]
             indexedFeature = feature[i, :, x, y] * xi * yi # shape = (C, S), S = proj.shape[0]
             indexedFeature = indexedFeature + feature[i, :, xplus1, y] * xi_ * yi
             indexedFeature = indexedFeature + feature[i, :, x, yplus1] * xi * yi_
