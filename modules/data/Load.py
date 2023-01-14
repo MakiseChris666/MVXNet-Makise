@@ -42,7 +42,7 @@ def createDataset(splitSet: List[str], needCrop = False) -> \
 
         path = os.path.join(imroot, s + '.png')
         img = cv.imread(path)
-        img = img[:imsize[0], :imsize[1]]
+        img = img[:imsize[1], :imsize[0]]
 
         path = os.path.join(labelroot, s + '.txt')
         labels = pd.read_csv(path, sep = ' ', index_col = 0, usecols = [0, *[_ for _ in range(8, 15)]])
