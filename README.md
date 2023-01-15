@@ -25,8 +25,10 @@ and the dataset should arranged as:
 &emsp;|--velodyne
 
 Before you train the model, use the following command to preprocess the data:
-> python cropdata.py &lt;dataroot&gt;
+> python cropdata.py &lt;dataroot&gt; &lt;mode&gt;
 
 `cropdata.py` will create a folder `velodyne_croped` in 
 `<dataroot>/training`, and the training process will use
-the processed data
+the processed data.
+
+`mode` can be `numpy`, `torch`, `torch-cuda`, default `numpy`.
