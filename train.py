@@ -26,7 +26,7 @@ def train():
         trainSet = f.read().splitlines()
     # with open(testInfoPath, 'r') as f:
     #     testSet = f.read().splitlines()
-    random.shuffle(trainSet)
+    # random.shuffle(trainSet)
 
     trainX, trainY, trainCalibs = load.createDataset(trainSet)
     # testX, testY, testCalibs = load.createDataset(testSet)

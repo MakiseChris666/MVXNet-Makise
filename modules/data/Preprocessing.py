@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from modules.Extension import cpp
 from modules import utils
-from typing import Sequence
+from typing import Sequence, Union
 
 def crop(pcd: np.ndarray, range: Sequence[float]):
     low = np.array(range[0:3])
@@ -11,7 +11,14 @@ def crop(pcd: np.ndarray, range: Sequence[float]):
     f = np.all((low <= roi) & (roi < high), axis = 1)
     return pcd[f]
 
-def cropToSight(pcd: np.ndarray, calib: dict, imsize: Sequence[int]):
+def cropTensor(pcd: torch.Tensor, range: Sequence[float]):
+    low = torch.Tensor(range[0:3]).to(pcd.device)
+    high = torch.Tensor(range[3:6]).to(pcd.device)
+    roi = pcd[:, :3]
+    f = torch.all((low <= roi) & (roi < high), dim = 1) # noqa
+    return pcd[f]
+
+def cropToSight(pcd: Union[np.ndarray, torch.Tensor], calib: dict, imsize: Sequence[int]):
     """
     Notice that imsize is in (w, h)
     @param pcd:
@@ -21,9 +28,16 @@ def cropToSight(pcd: np.ndarray, calib: dict, imsize: Sequence[int]):
     """
     # it seems that there exists minor difference between the calculation result from numpy and pytorch
     # so to avoid such inconsistency, the image size is subtracted by a small number
-    imsize = np.array(imsize) - 1e-3
-    points = pcd.T[:3]
-    points = np.concatenate([points, np.ones((1, points.shape[1]))], axis = 0)
+    if isinstance(pcd, np.ndarray):
+        imsize = np.array(imsize) - 1e-3
+        points = np.empty((4, pcd.shape[0]), dtype = 'float32')
+        all = lambda x: np.all(x, axis = 1)
+    else:
+        imsize = torch.Tensor(imsize).to(pcd.device) - 1e-3
+        points = torch.empty((4, pcd.shape[0]), dtype = torch.float32, device = pcd.device)
+        all = lambda x: torch.all(x, dim = 1)
+    points[:3] = pcd.T[:3]
+    points[3] = 1
     points = calib['R0_rect'] @ calib['Tr_velo_to_cam'] @ points
     f = points[2] > 0
     pcd = pcd[f]
@@ -31,7 +45,7 @@ def cropToSight(pcd: np.ndarray, calib: dict, imsize: Sequence[int]):
     points = calib['P2'] @ points
     points[:2] = points[:2] / points[2]
     points = points[:2].T
-    f = (points >= 0).all(axis = 1) & (points < imsize).all(axis = 1) # noqa
+    f = all(points >= 0) & all(points < imsize) # noqa
     pcd = pcd[f]
     return pcd
 
