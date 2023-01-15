@@ -12,8 +12,8 @@ using std::unordered_map;
 using std::swap;
 using std::reverse;
 
-const float eps = 1E-8;
-const int maxn = 501;
+const float eps = 1e-6;
+const int maxn = 51;
 
 int sig(float d) {
     return(d > eps) - (d < -eps);
@@ -48,7 +48,7 @@ int lineCross(Point a, Point b, Point c, Point d, Point& p) {
 }
 
 void polygon_cut(Point* p, int& n, Point a, Point b) {
-    static Point pp[maxn];
+    static Point pp[20];
     int m = 0; p[n] = p[0];
     for (int i = 0; i < n; i++) {
         if (sig(cross(a, b, p[i])) > 0) pp[m++] = p[i];
@@ -94,7 +94,7 @@ float intersectArea(Point* ps1, int n1, Point* ps2, int n2) {
 
 auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long long> nls, array_t<long long> nws,
     float negThr, float posThr) {
-    static Point r1[4], r2[4];
+    static Point r1[5], r2[5];
     int anchorsPerLoc = anchors.shape(2);
     auto _gts = gts.unchecked<3>();
     auto _anchors = anchors.unchecked<5>();
