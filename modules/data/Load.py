@@ -45,7 +45,7 @@ def createDataset(splitSet: List[str], needCrop = False) -> \
         img = img[:imsize[1], :imsize[0]]
 
         path = os.path.join(labelroot, s + '.txt')
-        labels = pd.read_csv(path, sep = ' ', index_col = 0, usecols = [0, *[_ for _ in range(8, 15)]])
+        labels = pd.read_csv(path, sep = ' ', index_col = 0, usecols = [0, *[_ for _ in range(8, 15)]], header = None)
         labels = labels[labels.index == 'Car'].to_numpy()
 
         path = os.path.join(calibroot, s + '.txt')
