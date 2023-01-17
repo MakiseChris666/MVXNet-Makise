@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 from modules.Extension import cpp
-from modules import utils
-from typing import Sequence, Union
+from typing import Sequence, Union, List
+from numba import njit
 
 def crop(pcd: np.ndarray, range: Sequence[float]):
     low = np.array(range[0:3])
@@ -49,7 +49,15 @@ def cropToSight(pcd: Union[np.ndarray, torch.Tensor], calib: dict, imsize: Seque
     pcd = pcd[f]
     return pcd
 
-def group(pcd: np.ndarray, range: Sequence[float], size, samplesPerVoxel: int):
+def group_(pcd: np.ndarray, range: Sequence[float], size: Sequence[float], samplesPerVoxel: int):
+    """
+    Group method optimized using cpp
+    @param samplesPerVoxel: Sampling times for each voxel
+    @param pcd: Point cloud
+    @param range: Point cloud range
+    @param size: Size of each voxel
+    @return: (voxel, indices), voxel in (N, 35, 7), indices in (N, 3)
+    """
     np.random.shuffle(pcd)
     pts = pcd[:, :3]
     low = np.array(range[0:3])
@@ -59,29 +67,46 @@ def group(pcd: np.ndarray, range: Sequence[float], size, samplesPerVoxel: int):
     voxel[..., 3:6] = voxel[..., :3] - center[:, None, :]
     return voxel, np.array(uidx).T
 
-def group_(pcd, range, size, samplesPerVoxel):
+@njit
+def group(pcd: np.ndarray, range: List[float], size: List[float], samplesPerVoxel: int):
     """
-
-    @param samplesPerVoxel:
-    @param pcd:
-    @param range:
-    @param size:
+    Group method optimized by numba
+    @param samplesPerVoxel: Sampling times for each voxel
+    @param pcd: Point cloud
+    @param range: Point cloud range
+    @param size: Size of each voxel
     @return: (voxel, indices), voxel in (N, 35, 7), indices in (N, 3)
     """
     np.random.shuffle(pcd)
     pts = pcd[:, :3]
     low = np.array(range[0:3])
-    idx = ((pts - low) / size).astype('int32')
-    uidx, inv = np.unique(idx, axis = 0, return_inverse = True)
-    voxel = np.zeros((len(uidx), samplesPerVoxel, 7))
-    vcnt = np.zeros(len(uidx), dtype = 'int32')
-    for i, p in zip(inv, pcd):
-        if vcnt[i] == samplesPerVoxel:
-            continue
-        voxel[i, vcnt[i], [0, 1, 2, 6]] = p
-        vcnt[i] += 1
-    center = voxel[..., :3].sum(axis = 1) / vcnt[:, None]
-    voxel[..., 3:6] = voxel[..., :3] - center[:, None, :]
+    size = np.array(size)
+    idx = ((pts - low) / size).astype(np.int32)
+    mp = {}
+    cnt = {}
+    for p, i in zip(pcd, idx):
+        i = (i[0], i[1], i[2])
+        if i not in mp:
+            mp[i] = np.zeros((samplesPerVoxel, 7))
+            cnt[i] = 0
+        if cnt[i] < samplesPerVoxel:
+            v = mp[i]
+            c = cnt[i]
+            v[c, 0], v[c, 1], v[c, 2], v[c, 6] = p[0], p[1], p[2], p[3]
+            cnt[i] += 1
+    voxel = np.empty((len(mp), samplesPerVoxel, 7))
+    vcnt = []
+    uidx = []
+    for i, k in enumerate(mp.keys()):
+        voxel[i] = mp[k]
+        vcnt.append(cnt[k])
+        uidx.append(k)
+    vcnt = np.array(vcnt)
+    uidx = np.array(uidx)
+    vcnt = np.expand_dims(vcnt, axis = 1)
+    center = voxel[..., :3].sum(axis = 1) / vcnt
+    center = np.expand_dims(center, axis = 1)
+    voxel[..., 3:6] = voxel[..., :3] - center
     return voxel, uidx
 
 def createAnchors(l, w, range, size):
