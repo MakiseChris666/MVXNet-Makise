@@ -3,6 +3,11 @@ import torch
 from modules.Extension import cpp
 from typing import Sequence, Union, List
 from numba import njit
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+import warnings
+
+warnings.simplefilter('ignore', category = NumbaDeprecationWarning)
+warnings.simplefilter('ignore', category = NumbaPendingDeprecationWarning)
 
 def crop(pcd: np.ndarray, range: Sequence[float]):
     low = np.array(range[0:3])
