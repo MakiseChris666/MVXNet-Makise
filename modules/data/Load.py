@@ -21,7 +21,7 @@ rangeMax = torch.Tensor(cfg.velorange[3:])
 imsize = cfg.imsize[::-1]
 
 def createDataset(splitSet: List[str], needCrop = False) -> \
-        Tuple[List[Tuple[np.ndarray, np.ndarray]], List[Tuple[torch.Tensor, torch.Tensor]], List[Dict[str, torch.Tensor]]]:
+        List[Tuple[np.ndarray, np.ndarray, torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]]:
     """
     Read KITTI data from root.
     @param splitSet: Names of files to read. e.g. ['000000', '000001', ...]
