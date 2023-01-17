@@ -28,7 +28,7 @@ def train():
     #     testSet = f.read().splitlines()
     # random.shuffle(trainSet)
 
-    trainX, trainY, trainCalibs = load.createDataset(trainSet)
+    trainDataSet = load.createDataset(trainSet)
     # testX, testY, testCalibs = load.createDataset(testSet)
 
     anchors = pre.createAnchors(cfg.voxelshape[0] // 2, cfg.voxelshape[1] // 2,
@@ -66,16 +66,17 @@ def train():
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
 
     # calibs will be used only in forwarding, so we preprocess it into the target device
-    for c in trainCalibs:
+    for _, _, _, _, c in trainDataSet:
         for k in c.keys():
             c[k] = c[k].to(device)
 
     epochst = time.perf_counter()
     for epoch in range(iterations):
-        for i, (x, y, calib) in enumerate(zip(trainX, trainY, trainCalibs)):
+        random.shuffle(trainDataSet)
+        for i, (pcd, img, gt, gtbev, calib) in enumerate(trainDataSet):
             # shape = (N, 35, 7)
             st = time.perf_counter()
-            voxel, idx = pre.group(x[0], cfg.velorange, cfg.voxelsize, cfg.samplenum)
+            voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
 
             ed = time.perf_counter()
             groupTime += ed - st
@@ -86,15 +87,8 @@ def train():
             opt.zero_grad()
             st = time.perf_counter()
             voxel = torch.Tensor(voxel).to(device)
-
-            # points = voxel[..., :3].reshape((-1, 3))
-            # zero = torch.all(points == 0, dim = 1)
-            # proj = utils.lidar2Img(voxel[..., :3].reshape((-1, 3)), calib, True)
-            # proj[zero] = 0
-            # assert torch.all(torch.max(proj, dim = 0)[0] < imsize[[1, 0]])
-
             idx = torch.LongTensor(idx).to(device)
-            img = torch.Tensor(x[1]).to(device).permute(2, 0, 1) / 255
+            img = torch.Tensor(img).to(device).permute(2, 0, 1) / 255
             img = img[None, ...]
             score, reg = model(voxel, img, idx, [calib], imsize)
             score = score.squeeze(dim = 0).permute(1, 2, 0)
@@ -103,9 +97,9 @@ def train():
             forwardTime += ed - st
 
             st = time.perf_counter()
-            if y[0] is not None:
-                pi, ni, gi = classifyAnchors(y[1], y[0][:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
-                l = y[0].to(device)
+            if gt is not None:
+                pi, ni, gi = classifyAnchors(gtbev, gt[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
+                l = gt.to(device)
             else:
                 pi, ni, gi, l = None, None, None, None
 

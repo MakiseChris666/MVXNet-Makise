@@ -26,12 +26,10 @@ def createDataset(splitSet: List[str], needCrop = False) -> \
     Read KITTI data from root.
     @param splitSet: Names of files to read. e.g. ['000000', '000001', ...]
     @param needCrop: Whether to crop point clouds, set to True if directly read from the raw data; Default False
-    @return: (x, y, calibs), x is a list of (point cloud, image); y is a list of (bbox, bev of bbox)
-            ((None, None) if there's no gtbox), bbox in LiDAR coordinates; calibs is a list of dict containing the
-            calibration matrices
+    @return: (point cloud, image, bbox, bev of bbox, calib), bbox and bev of bbox will be None if there's no gt box,
+            bbox is in LiDAR coordinates; calib is a dict containing the calibration matrices
     """
-    x, y = [], []
-    calibs = []
+    dataset = []
     sum = len(splitSet)
     for i, s in enumerate(splitSet):
         print(f'\rProcessing: {i + 1}/{sum}', end = '')
@@ -68,14 +66,12 @@ def createDataset(splitSet: List[str], needCrop = False) -> \
 
         if needCrop:
             velo = pre.cropToSight(velo, calib, imsize)
-        x.append((velo, img))
 
         for k in calib.keys():
             calib[k] = torch.Tensor(calib[k])
-        calibs.append(calib)
 
         if len(labels) == 0:
-            y.append((None, None))
+            dataset.append((velo, img, None, None, calib))
             continue
 
         c2v = torch.linalg.inv(calib['Tr_velo_to_cam'])
@@ -85,7 +81,7 @@ def createDataset(splitSet: List[str], needCrop = False) -> \
                   torch.all(labels[:, :3].__ge__(rangeMin[None, ...]), dim = 1)
         labels = labels[inRange].contiguous()
         bevs = Calc.bbox3d2bev(labels)
-        y.append((labels, bevs))
+        dataset.append((velo, img, labels, bevs, calib))
 
     print()
-    return x, y, calibs
+    return dataset
