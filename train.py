@@ -12,7 +12,7 @@ import numpy as np
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
-if len(sys.argv) > 1 and sys.argv[1] != '#':
+if len(sys.argv) > 1 and sys.argv[1] != '-':
     dataroot = sys.argv[1]
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
@@ -24,12 +24,8 @@ def train():
 
     with open(trainInfoPath, 'r') as f:
         trainSet = f.read().splitlines()
-    # with open(testInfoPath, 'r') as f:
-    #     testSet = f.read().splitlines()
-    # random.shuffle(trainSet)
 
     trainDataSet = load.createDataset(trainSet)
-    # testX, testY, testCalibs = load.createDataset(testSet)
 
     anchors = pre.createAnchors(cfg.voxelshape[0] // 2, cfg.voxelshape[1] // 2,
                                           cfg.velorange, cfg.carsize)
@@ -73,6 +69,9 @@ def train():
     epochst = time.perf_counter()
     for epoch in range(iterations):
         random.shuffle(trainDataSet)
+        clsLossSum, regLossSum = 0.0, 0.0
+        maxClsLoss, maxRegLoss = 0.0, 0.0
+        regCnt = 0
         for i, (pcd, img, gt, gtbev, calib) in enumerate(trainDataSet):
             # shape = (N, 35, 7)
             st = time.perf_counter()
@@ -109,8 +108,13 @@ def train():
             st = time.perf_counter()
             clsLoss, regLoss = criterion(pi, ni, gi, l, score, reg, anchors, 2)
             loss = clsLoss
+            clsLossSum += clsLoss.item()
+            maxClsLoss = max(maxClsLoss, clsLoss.item())
             if regLoss is not None:
                 loss = loss + regLoss
+                regLossSum += regLoss.item()
+                maxRegLoss = max(maxRegLoss, regLoss.item())
+                regCnt += 1
             ed = time.perf_counter()
             lossTime += ed - st
 
@@ -123,8 +127,12 @@ def train():
             if (i + 1) % 100 == 0:
                 print('\r', groupTime, forwardTime, classifyTime, lossTime, backwardTime, allTime)
 
-            print(f'\rEpoch{epoch + lastiter + 1} {i + 1}/{len(trainSet)}', 'Classification Loss:', clsLoss.item()
-                  , 'Regression Loss:', 'None' if regLoss is None else regLoss.item(), end = '')
+            print(f'\rEpoch{epoch + lastiter + 1} {i + 1}/{len(trainSet)}', end = ' ')
+            if (i + 1) % 50 == 0:
+                print('\nAverage classfication loss: %.6f, Average regression loss: %.6f'
+                      % (clsLossSum / (i + 1), regLossSum / regCnt))
+                print('Max classfication loss: %.6f, Max regression loss: %.6f'
+                      % (maxClsLoss, maxRegLoss))
             epoched = time.perf_counter()
             allTime = epoched - epochst
 
