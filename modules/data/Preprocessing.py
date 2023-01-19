@@ -4,6 +4,8 @@ from modules.Extension import cpp
 from typing import Sequence, Union, List
 from numba import njit
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+from numba.typed import Dict
+from numba import types
 import warnings
 
 warnings.simplefilter('ignore', category = NumbaDeprecationWarning)
@@ -72,6 +74,9 @@ def group_(pcd: np.ndarray, range: Sequence[float], size: Sequence[float], sampl
     voxel[..., 3:6] = voxel[..., :3] - center[:, None, :]
     return voxel, np.array(uidx).T
 
+floatArray2d = types.float64[:, :]
+intTriple = types.Tuple((types.int32, types.int32, types.int32))
+
 @njit
 def group(pcd: np.ndarray, range: List[float], size: List[float], samplesPerVoxel: int):
     """
@@ -89,25 +94,25 @@ def group(pcd: np.ndarray, range: List[float], size: List[float], samplesPerVoxe
     idx = ((pts - low) / size).astype(np.int32)
     mp = {}
     cnt = {}
+    keys = []
     for p, i in zip(pcd, idx):
         i = (i[0], i[1], i[2])
         if i not in mp:
             mp[i] = np.zeros((samplesPerVoxel, 7))
             cnt[i] = 0
+            keys.append(i)
         if cnt[i] < samplesPerVoxel:
             v = mp[i]
             c = cnt[i]
             v[c, 0], v[c, 1], v[c, 2], v[c, 6] = p[0], p[1], p[2], p[3]
             cnt[i] += 1
     voxel = np.empty((len(mp), samplesPerVoxel, 7))
-    vcnt = []
-    uidx = []
-    for i, k in enumerate(mp.keys()):
+    vcnt = np.empty(len(mp))
+    uidx = np.empty((len(mp), 3))
+    for i, k in enumerate(keys):
         voxel[i] = mp[k]
-        vcnt.append(cnt[k])
-        uidx.append(k)
-    vcnt = np.array(vcnt)
-    uidx = np.array(uidx)
+        vcnt[i] = cnt[k]
+        uidx[i, 0], uidx[i, 1], uidx[i, 2] = k[0], k[1], k[2]
     vcnt = np.expand_dims(vcnt, axis = 1)
     center = voxel[..., :3].sum(axis = 1) / vcnt
     center = np.expand_dims(center, axis = 1)
