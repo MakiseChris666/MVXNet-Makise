@@ -19,7 +19,7 @@ bnaffine: False # whether to use trainable BN layers
 bntrack: False # whether to update var and mean in BN
 samplenum: 35
 numthreads: 8
-multiprocess: 4
+multiprocess: 0
 imsize:
   - 370
   - 1224
