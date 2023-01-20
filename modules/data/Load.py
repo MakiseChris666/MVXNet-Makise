@@ -9,7 +9,7 @@ from modules import Calc, Config as cfg
 import cv2 as cv
 
 dataroot = '../mmdetection3d-master/data/kitti'
-if len(sys.argv) > 1 and sys.argv[1] != '#':
+if len(sys.argv) > 1 and sys.argv[1] != '-' and sys.argv[1] != '-f':
     dataroot = sys.argv[1]
 veloroot = os.path.join(dataroot, 'training/velodyne_croped')
 labelroot = os.path.join(dataroot, 'training/label_2')
@@ -80,6 +80,9 @@ def createDataset(splitSet: List[str], needCrop = False) -> \
         inRange = torch.all(labels[:, :3].__lt__(rangeMax[None, ...]), dim = 1) & \
                   torch.all(labels[:, :3].__ge__(rangeMin[None, ...]), dim = 1)
         labels = labels[inRange].contiguous()
+        if len(labels) == 0:
+            dataset.append((velo, img, None, None, calib))
+            continue
         bevs = Calc.bbox3d2bev(labels)
         dataset.append((velo, img, labels, bevs, calib))
 

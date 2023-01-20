@@ -114,14 +114,13 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
         }
         float gtArea = area(r1, 4);
         for (pyint z = 0; z < anchorsPerLoc; z++) {
-            float ioull = 0;
             for (pyint h = 0; nl + h < l; h++) {
                 for (int j = 0; j < 4; j++) {
                     r2[j].x = _anchors(nl + h, nw, z, j, 0), r2[j].y = _anchors(nl + h, nw, z, j, 1);
                 }
                 float inter = intersectArea(r1, 4, r2, 4);
                 float iou = inter / (gtArea + anchorArea - inter);
-                if (iou < negThr && iou <= ioull) {
+                if (iou < 0.1) {
                     break;
                 }
                 if (iou >= posThr) {
@@ -141,15 +140,13 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
                     ni[1].push_back(nw);
                     ni[2].push_back(z);
                 }
-                ioull = iou;
-                float ioul = 0;
                 for (pyint v = 1; nw + v < w; v++) {
                     for (int j = 0; j < 4; j++) {
                         r2[j].x = _anchors(nl + h, nw + v, z, j, 0), r2[j].y = _anchors(nl + h, nw + v, z, j, 1);
                     }
                     inter = intersectArea(r1, 4, r2, 4);
                     iou = inter / (gtArea + anchorArea - inter);
-                    if (iou < negThr && iou <= ioul) {
+                    if (iou < 0.1) {
                         break;
                     }
                     if (iou >= posThr) {
@@ -169,16 +166,14 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
                         ni[1].push_back(nw + v);
                         ni[2].push_back(z);
                     }
-                    ioul = iou;
                 }
-                ioul = 0;
                 for (pyint v = -1; nw + v >= 0; v--) {
                     for (int j = 0; j < 4; j++) {
                         r2[j].x = _anchors(nl + h, nw + v, z, j, 0), r2[j].y = _anchors(nl + h, nw + v, z, j, 1);
                     }
                     inter = intersectArea(r1, 4, r2, 4);
                     iou = inter / (gtArea + anchorArea - inter);
-                    if (iou < negThr && iou <= ioul) {
+                    if (iou < 0.1) {
                         break;
                     }
                     if (iou >= posThr) {
@@ -194,17 +189,15 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
                         ni[1].push_back(nw + v);
                         ni[2].push_back(z);
                     }
-                    ioul = iou;
                 }
             }
-            ioull = 0;
             for (pyint h = -1; nl + h >= 0; h--) {
                 for (int j = 0; j < 4; j++) {
                     r2[j].x = _anchors(nl + h, nw, z, j, 0), r2[j].y = _anchors(nl + h, nw, z, j, 1);
                 }
                 float inter = intersectArea(r1, 4, r2, 4);
                 float iou = inter / (gtArea + anchorArea - inter);
-                if (iou < negThr && iou <= ioull) {
+                if (iou < 0.1) {
                     break;
                 }
                 if (iou >= posThr) {
@@ -224,15 +217,13 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
                     ni[1].push_back(nw);
                     ni[2].push_back(z);
                 }
-                ioull = iou;
-                float ioul = 0;
                 for (pyint v = 1; nw + v < w; v++) {
                     for (int j = 0; j < 4; j++) {
                         r2[j].x = _anchors(nl + h, nw + v, z, j, 0), r2[j].y = _anchors(nl + h, nw + v, z, j, 1);
                     }
                     inter = intersectArea(r1, 4, r2, 4);
                     iou = inter / (gtArea + anchorArea - inter);
-                    if (iou < negThr && iou <= ioul) {
+                    if (iou < 0.1) {
                         break;
                     }
                     if (iou >= posThr) {
@@ -248,16 +239,14 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
                         ni[1].push_back(nw + v);
                         ni[2].push_back(z);
                     }
-                    ioul = iou;
                 }
-                ioul = 0;
                 for (pyint v = -1; nw + v >= 0; v--) {
                     for (int j = 0; j < 4; j++) {
                         r2[j].x = _anchors(nl + h, nw + v, z, j, 0), r2[j].y = _anchors(nl + h, nw + v, z, j, 1);
                     }
                     inter = intersectArea(r1, 4, r2, 4);
                     iou = inter / (gtArea + anchorArea - inter);
-                    if (iou < negThr && iou <= ioul) {
+                    if (iou < 0.1) {
                         break;
                     }
                     if (iou >= posThr) {
@@ -273,7 +262,6 @@ auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long lo
                         ni[1].push_back(nw + v);
                         ni[2].push_back(z);
                     }
-                    ioul = iou;
                 }
             }
         }

@@ -59,25 +59,19 @@ def bbox3d2corner(bbox3ds: torch.Tensor) -> torch.Tensor:
         res = res[0]
     return res
 
-def iou2d(rs1: torch.Tensor, rs2: torch.Tensor):
+def iou2d(rs1: Sequence[Polygon], rs2: Sequence[Polygon]):
     """
     Compute pairwise iou between every box in rs1 and rs2
     @param rs1: (N, 4, 2) in corner points format
     @param rs2: (M, 4, 2) in corner points format
     @return: (N, M),
     """
-    res = torch.zeros((rs1.shape[0], rs2.shape[0]))
-    assert rs1.ndim == 3 and rs2.ndim == 3 and rs1.shape[1:] == (4, 2) and rs2.shape[1:] == (4, 2)
-    p1 = []
-    p2 = []
-    for r1 in rs1:
-        p1.append(Polygon(r1))
-    for r2 in rs2:
-        p2.append(Polygon(r2))
-    for i, r1 in enumerate(p1):
-        for j, r2 in enumerate(p2):
-            overlap = r1.intersection(r2).area
-            res[i, j] = overlap / (r1.area + r2.area - overlap)
+    res = torch.empty((len(rs1), len(rs2)))
+    for i, r1 in enumerate(rs1):
+        for j, r2 in enumerate(rs2):
+            inter = r1.intersection(r2).area
+            iou = inter / (r1.area + r2.area - inter)
+            res[i, j] = iou
     return res
 
 def getPolygons(bboxes):
@@ -112,9 +106,9 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
     @param posThr:
     @return: (pos, neg, gi), gi is the corresponding indices of gt to every positive anchor
     """
-    pos = torch.zeros(anchors.shape, dtype = torch.bool, device = 'cuda')
-    neg = torch.ones(anchors.shape, dtype = torch.bool, device = 'cuda')
-    gi = torch.zeros_like(pos, dtype = torch.int64, device = 'cuda')
+    pos = torch.zeros(anchors.shape, dtype = torch.bool)
+    neg = torch.ones(anchors.shape, dtype = torch.bool)
+    gi = torch.zeros_like(pos, dtype = torch.int64)
     anchorsPerLoc = anchors.shape[2]
     l = (velorange[3] - velorange[0]) / anchors.shape[0]
     w = (velorange[4] - velorange[1]) / anchors.shape[1]
@@ -122,20 +116,15 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
     nws = ((gtCenters[:, 1] - velorange[1] - w / 2) / w + 0.5).long()
     anchorArea = anchors[0, 0, 0].area
     for i, gt in enumerate(gts):
-        # cx, cy = gt.centroid.xy
-        # cx, cy = cx[0], cy[0]
-        # nl = int((cx - velorange[0] - l / 2) / l + 0.5)
-        # nw = int((cy - velorange[1] - w / 2) / w + 0.5)
         nl = nls[i]
         nw = nws[i]
         gtArea = gt.area
         for z in range(anchorsPerLoc):
             h = 0
-            ioull = 0
             while nl + h < anchors.shape[0]:
                 inter = anchors[nl + h, nw, z].intersection(gt).area
                 iou = inter / (gtArea + anchorArea - inter)
-                if iou < negThr and iou <= ioull:
+                if iou < 0.1:
                     break
                 if iou >= posThr:
                     pos[nl + h, nw, z] = 1
@@ -144,12 +133,10 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
                 elif iou >= negThr:
                     neg[nl + h, nw, z] = 0
                 v = 1
-                ioull = iou
-                ioul = 0
                 while nw + v < anchors.shape[1]:
                     inter = anchors[nl + h, nw + v, z].intersection(gt).area
                     iou = inter / (gtArea + anchorArea - inter)
-                    if iou < negThr and iou <= ioul:
+                    if iou < 0.1:
                         break
                     if iou >= posThr:
                         pos[nl + h, nw + v, z] = 1
@@ -158,13 +145,11 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
                     elif iou >= negThr:
                         neg[nl + h, nw + v, z] = 0
                     v += 1
-                    ioul = iou
                 v = -1
-                ioul = 0
                 while nw + v >= 0:
                     inter = anchors[nl + h, nw + v, z].intersection(gt).area
                     iou = inter / (gtArea + anchorArea - inter)
-                    if iou < negThr and iou <= ioul:
+                    if iou < 0.1:
                         break
                     if iou >= posThr:
                         pos[nl + h, nw + v, z] = 1
@@ -173,14 +158,12 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
                     elif iou >= negThr:
                         neg[nl + h, nw + v, z] = 0
                     v -= 1
-                    ioul = iou
                 h += 1
             h = -1
-            ioull = 0
             while nl + h >= 0:
                 inter = anchors[nl + h, nw, z].intersection(gt).area
                 iou = inter / (gtArea + anchorArea - inter)
-                if iou < negThr and iou <= ioull:
+                if iou < 0.1:
                     break
                 if iou >= posThr:
                     pos[nl + h, nw, z] = 1
@@ -188,13 +171,11 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
                     neg[nl + h, nw, z] = 0
                 elif iou >= negThr:
                     neg[nl + h, nw, z] = 0
-                ioull = iou
-                ioul = 0
                 v = 1
                 while nw + v < anchors.shape[1]:
                     inter = anchors[nl + h, nw + v, z].intersection(gt).area
                     iou = inter / (gtArea + anchorArea - inter)
-                    if iou < negThr and iou <= ioul:
+                    if iou < 0.1:
                         break
                     if iou >= posThr:
                         pos[nl + h, nw + v, z] = 1
@@ -203,13 +184,11 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
                     elif iou >= negThr:
                         neg[nl + h, nw + v, z] = 0
                     v += 1
-                    ioul = iou
                 v = -1
-                ioul = 0
                 while nw + v >= 0:
                     inter = anchors[nl + h, nw + v, z].intersection(gt).area
                     iou = inter / (gtArea + anchorArea - inter)
-                    if iou < negThr and iou <= ioul:
+                    if iou < 0.1:
                         break
                     if iou >= posThr:
                         pos[nl + h, nw + v, z] = 1
@@ -218,7 +197,6 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
                     elif iou >= negThr:
                         neg[nl + h, nw + v, z] = 0
                     v -= 1
-                    ioul = iou
                 h -= 1
     return pos, neg, gi
     # pi = torch.where(pos)
