@@ -127,7 +127,7 @@ def train(processPool):
                 print('\r', forwardTime, lossTime, backwardTime, allTime)
 
             print(f'\rEpoch{epoch + lastiter + 1} {i + 1}/{len(trainSet)}', end = ' ')
-            if (i + 1) % 50 == 0:
+            if (i + 1) % 50 == 0 or i + 1 == len(trainSet):
                 print('\nAverage classfication loss: %.6f, Average regression loss: %.6f'
                       % (clsLossSum / (i + 1), regLossSum / regCnt))
                 print('Max classfication loss: %.6f, Max regression loss: %.6f'
