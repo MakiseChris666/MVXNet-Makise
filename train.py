@@ -9,6 +9,7 @@ from modules.data import Load as load, Preprocessing as pre
 from MVXNet import MVXNet
 from modules.voxelnet import VoxelLoss
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
@@ -17,10 +18,16 @@ if len(sys.argv) > 1 and sys.argv[1] != '-':
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
 
-if cfg.numthreads != -1:
-    torch.set_num_threads(cfg.numthreads)
+def cputask(data, anchorBevs):
+    pcd, img, gt, gtbev, calib = data
+    voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
+    if gt is not None:
+        pi, ni, gi = classifyAnchors(gtbev, gt[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
+    else:
+        pi, ni, gi, l = None, None, None, None
+    return voxel, idx, img, gt, gtbev, pi, ni, gi, calib
 
-def train():
+def train(processPool):
 
     with open(trainInfoPath, 'r') as f:
         trainSet = f.read().splitlines()
@@ -29,10 +36,10 @@ def train():
 
     anchors = pre.createAnchors(cfg.voxelshape[0] // 2, cfg.voxelshape[1] // 2,
                                           cfg.velorange, cfg.carsize)
-    model = MVXNet()
     anchorBevs = bbox3d2bev(anchors.reshape(anchors.shape[:2] + (-1, 7)))
+    model = MVXNet()
     criterion = VoxelLoss()
-    opt = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.001)
+    opt = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.001)
     # torch.autograd.set_detect_anomaly(True)
 
     model = model.to(device)
@@ -40,9 +47,7 @@ def train():
     criterion = criterion.to(device)
     imsize = torch.Tensor(cfg.imsize).to(device)
 
-    groupTime = 0
     forwardTime = 0
-    classifyTime = 0
     lossTime = 0
     backwardTime = 0
     allTime = 0
@@ -62,9 +67,9 @@ def train():
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
 
     # calibs will be used only in forwarding, so we preprocess it into the target device
-    for _, _, _, _, c in trainDataSet:
-        for k in c.keys():
-            c[k] = c[k].to(device)
+    # for _, _, _, _, c in trainDataSet:
+    #     for k in c.keys():
+    #         c[k] = c[k].to(device)
 
     epochst = time.perf_counter()
     for epoch in range(iterations):
@@ -72,13 +77,14 @@ def train():
         clsLossSum, regLossSum = 0.0, 0.0
         maxClsLoss, maxRegLoss = 0.0, 0.0
         regCnt = 0
-        for i, (pcd, img, gt, gtbev, calib) in enumerate(trainDataSet):
+        preprocessed = [processPool.submit(cputask, data, anchorBevs) for data in trainDataSet]
+        for i, res in enumerate(as_completed(preprocessed)):
             # shape = (N, 35, 7)
-            st = time.perf_counter()
-            voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
+            voxel, idx, img, gt, gtbev, pi, ni, gi, calibCpu = res.result()
+            calib = {}
+            for k in calibCpu.keys():
+                calib[k] = calibCpu[k].to(device)
 
-            ed = time.perf_counter()
-            groupTime += ed - st
             # shape = (batch, N, 35, 7)
             voxel = voxel[None, :]
             idx = np.concatenate([np.zeros((idx.shape[0], 1)), idx], axis = 1)
@@ -95,15 +101,7 @@ def train():
             ed = time.perf_counter()
             forwardTime += ed - st
 
-            st = time.perf_counter()
-            if gt is not None:
-                pi, ni, gi = classifyAnchors(gtbev, gt[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
-                l = gt.to(device)
-            else:
-                pi, ni, gi, l = None, None, None, None
-
-            ed = time.perf_counter()
-            classifyTime += ed - st
+            l = gt.to(device) if gt is not None else None
 
             st = time.perf_counter()
             clsLoss, regLoss = criterion(pi, ni, gi, l, score, reg, anchors, 2)
@@ -125,7 +123,7 @@ def train():
             backwardTime += ed - st
 
             if (i + 1) % 100 == 0:
-                print('\r', groupTime, forwardTime, classifyTime, lossTime, backwardTime, allTime)
+                print('\r', forwardTime, lossTime, backwardTime, allTime)
 
             print(f'\rEpoch{epoch + lastiter + 1} {i + 1}/{len(trainSet)}', end = ' ')
             if (i + 1) % 50 == 0:
@@ -139,4 +137,7 @@ def train():
         torch.save(model.state_dict(), f'./checkpoints/epoch{epoch + lastiter + 1}.pkl')
 
 if __name__ == '__main__':
-    train()
+    if cfg.numthreads != -1:
+        torch.set_num_threads(cfg.numthreads)
+    with ProcessPoolExecutor(cfg.multiprocess) as pool:
+        train(pool)
