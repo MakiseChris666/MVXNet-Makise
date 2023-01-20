@@ -9,8 +9,6 @@ from modules.data import Load as load, Preprocessing as pre
 from MVXNet import MVXNet
 from modules.voxelnet import VoxelLoss
 import numpy as np
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from train_ import trainSingle
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
@@ -19,16 +17,7 @@ if len(sys.argv) > 1 and sys.argv[1] != '-':
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
 
-def cputask(data, anchorBevs):
-    pcd, img, gt, gtbev, calib = data
-    voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
-    if gt is not None:
-        pi, ni, gi = classifyAnchors(gtbev, gt[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
-    else:
-        pi, ni, gi, l = None, None, None, None
-    return voxel, idx, img, gt, gtbev, pi, ni, gi, calib
-
-def train(processPool):
+def trainSingle():
 
     with open(trainInfoPath, 'r') as f:
         trainSet = f.read().splitlines()
@@ -48,7 +37,9 @@ def train(processPool):
     criterion = criterion.to(device)
     imsize = torch.Tensor(cfg.imsize).to(device)
 
+    groupTime = 0
     forwardTime = 0
+    classifyTime = 0
     lossTime = 0
     backwardTime = 0
     allTime = 0
@@ -68,9 +59,9 @@ def train(processPool):
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
 
     # calibs will be used only in forwarding, so we preprocess it into the target device
-    # for _, _, _, _, c in trainDataSet:
-    #     for k in c.keys():
-    #         c[k] = c[k].to(device)
+    for _, _, _, _, c in trainDataSet:
+        for k in c.keys():
+            c[k] = c[k].to(device)
 
     epochst = time.perf_counter()
     for epoch in range(iterations):
@@ -78,14 +69,13 @@ def train(processPool):
         clsLossSum, regLossSum = 0.0, 0.0
         maxClsLoss, maxRegLoss = 0.0, 0.0
         regCnt = 0
-        preprocessed = [processPool.submit(cputask, data, anchorBevs) for data in trainDataSet]
-        for i, res in enumerate(as_completed(preprocessed)):
+        for i, (pcd, img, gt, gtbev, calib) in enumerate(trainDataSet):
             # shape = (N, 35, 7)
-            voxel, idx, img, gt, gtbev, pi, ni, gi, calibCpu = res.result()
-            calib = {}
-            for k in calibCpu.keys():
-                calib[k] = calibCpu[k].to(device)
+            st = time.perf_counter()
+            voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
 
+            ed = time.perf_counter()
+            groupTime += ed - st
             # shape = (batch, N, 35, 7)
             voxel = voxel[None, :]
             idx = np.concatenate([np.zeros((idx.shape[0], 1)), idx], axis = 1)
@@ -102,7 +92,15 @@ def train(processPool):
             ed = time.perf_counter()
             forwardTime += ed - st
 
-            l = gt.to(device) if gt is not None else None
+            st = time.perf_counter()
+            if gt is not None:
+                pi, ni, gi = classifyAnchors(gtbev, gt[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
+                l = gt.to(device)
+            else:
+                pi, ni, gi, l = None, None, None, None
+
+            ed = time.perf_counter()
+            classifyTime += ed - st
 
             st = time.perf_counter()
             clsLoss, regLoss = criterion(pi, ni, gi, l, score, reg, anchors, 2)
@@ -124,7 +122,7 @@ def train(processPool):
             backwardTime += ed - st
 
             if (i + 1) % 100 == 0:
-                print('\r', forwardTime, lossTime, backwardTime, allTime)
+                print('\r', groupTime, forwardTime, classifyTime, lossTime, backwardTime, allTime)
 
             print(f'\rEpoch{epoch + lastiter + 1} {i + 1}/{len(trainSet)}', end = ' ')
             if (i + 1) % 50 == 0:
@@ -137,11 +135,7 @@ def train(processPool):
 
         torch.save(model.state_dict(), f'./checkpoints/epoch{epoch + lastiter + 1}.pkl')
 
-if __name__ == '__main__':
-    if cfg.numthreads != -1:
-        torch.set_num_threads(cfg.numthreads)
-    if cfg.multiprocess > 0:
-        with ProcessPoolExecutor(cfg.multiprocess) as pool:
-            train(pool)
-    else:
-        trainSingle()
+# if __name__ == '__main__':
+#     if cfg.numthreads != -1:
+#         torch.set_num_threads(cfg.numthreads)
+#     train()
