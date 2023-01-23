@@ -10,7 +10,7 @@ from MVXNet import MVXNet
 from modules.voxelnet import VoxelLoss
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from train_ import trainSingle
+# from train_ import trainSingle
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
@@ -78,10 +78,20 @@ def train(processPool):
         clsLossSum, regLossSum = 0.0, 0.0
         maxClsLoss, maxRegLoss = 0.0, 0.0
         regCnt = 0
-        preprocessed = [processPool.submit(cputask, data, anchorBevs) for data in trainDataSet]
-        for i, res in enumerate(as_completed(preprocessed)):
+        if processPool is None:
+            def process(data):
+                for d in data:
+                    yield cputask(d, anchorBevs)
+            processIter = process(trainDataSet)
+        else:
+            preprocessed = [processPool.submit(cputask, data, anchorBevs) for data in trainDataSet]
+            def process(futures):
+                for res in as_completed(futures):
+                    yield res.result()
+            processIter = process(preprocessed)
+        for i, res in enumerate(processIter):
             # shape = (N, 35, 7)
-            voxel, idx, img, gt, gtbev, pi, ni, gi, calibCpu = res.result()
+            voxel, idx, img, gt, gtbev, pi, ni, gi, calibCpu = res
             calib = {}
             for k in calibCpu.keys():
                 calib[k] = calibCpu[k].to(device)
@@ -144,4 +154,4 @@ if __name__ == '__main__':
         with ProcessPoolExecutor(cfg.multiprocess) as pool:
             train(pool)
     else:
-        trainSingle()
+        train(None)
