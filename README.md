@@ -39,3 +39,7 @@ the processed data.
 `create_gtdatabase.py` will crop the ground truth samples out
 of original data, and save them in `<dataroot>/training/gtdatabase`.
 These data will be used in data augmentation.
+
+Before you create gt database, please get `update_train_2020.json`
+from [KINS Dataset](https://github.com/qqlu/Amodal-Instance-Segmentation-through-KINS-Dataset),
+and put the file into `MVXNet-Makise/seglabel`.
