@@ -14,7 +14,7 @@ def lidar2P2(pcd: Union[np.ndarray, torch.Tensor], calib: dict):
     if isinstance(pcd, np.ndarray):
         points = np.empty((4, pcd.shape[0]), dtype = 'float32')
     elif isinstance(pcd, torch.Tensor):
-        points = torch.empty((4, pcd.shape[0]), dtype = torch.float32, device = pcd.device)
+        points = torch.empty((4, pcd.shape[0]), device = pcd.device)
     else:
         raise TypeError('pcd should be ndarray or Tensor')
     points[:3] = pcd[:, :3].T
@@ -35,7 +35,7 @@ def p22Lidar(pcd: Union[np.ndarray, torch.Tensor], calib: dict):
         points = np.empty((4, pcd.shape[0]), dtype = 'float32')
         inverse = np.linalg.inv
     elif isinstance(pcd, torch.Tensor):
-        points = torch.empty((4, pcd.shape[0]), dtype = torch.float32, device = pcd.device)
+        points = torch.empty((4, pcd.shape[0]), device = pcd.device)
         inverse = torch.linalg.inv
     else:
         raise TypeError('pcd should be ndarray or Tensor')
@@ -57,7 +57,7 @@ def lidar2Img(pcd: Union[np.ndarray, torch.Tensor], calib: dict, uncheck = False
     if isinstance(pcd, np.ndarray):
         points = np.empty((4, pcd.shape[0]), dtype = 'float32')
     elif isinstance(pcd, torch.Tensor):
-        points = torch.empty((4, pcd.shape[0]), dtype = torch.float32, device = pcd.device)
+        points = torch.empty((4, pcd.shape[0]), device = pcd.device)
     else:
         raise TypeError('pcd should be ndarray or Tensor')
     points[:3] = pcd[:, :3].T

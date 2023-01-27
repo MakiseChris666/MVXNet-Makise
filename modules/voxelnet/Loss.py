@@ -5,7 +5,7 @@ from modules import Config as cfg
 
 class VoxelLoss(nn.Module):
 
-    def __init__(self, a = 1.5, b = 1, eps = 1e-6):
+    def __init__(self, a = 1.5, b = 1, eps = cfg.eps):
         super().__init__()
         self.a = a
         self.b = b

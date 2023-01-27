@@ -85,6 +85,7 @@ def train(processPool):
         lastiter = int(sys.argv[3])
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
+        opt.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}_opt.pkl'))
 
     # calibs will be used only in forwarding, so we preprocess it into the target device
     # for _, _, _, _, c in trainDataSet:
@@ -165,10 +166,13 @@ def train(processPool):
             allTime = epoched - epochst
 
         torch.save(model.state_dict(), f'./checkpoints/epoch{epoch + lastiter + 1}.pkl')
+        torch.save(opt.state_dict(), f'./checkpoints/epoch{epoch + lastiter + 1}_opt.pkl')
 
 if __name__ == '__main__':
     if cfg.numthreads != -1:
         torch.set_num_threads(cfg.numthreads)
+    if cfg.half:
+        torch.set_default_tensor_type(torch.HalfTensor)
     if cfg.multiprocess > 0:
         with ProcessPoolExecutor(cfg.multiprocess) as pool:
             train(pool)

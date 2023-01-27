@@ -2,8 +2,8 @@ from torchvision.models.detection.faster_rcnn import FasterRCNN_ResNet50_FPN_V2_
 from torch import nn
 import torch
 from torch.nn import functional as f
-from modules import utils
 from modules.layers import FCN, CRB2d
+import modules.Config as cfg
 
 _fasterRCNN = fasterrcnn_resnet50_fpn_v2(weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
 
@@ -53,6 +53,7 @@ def featureMaping(voxels, features, calibs, imsize):
         xyz = v[..., :3].reshape((-1, 3))
         zero = torch.all(xyz == 0, dim = 1)
         proj = v[..., -2:].reshape((-1, 2))
+        proj = proj - cfg.eps # avoid precision problem
         proj[zero] = 0
         imageFeatures = []
         zero = zero.reshape(origshape)
