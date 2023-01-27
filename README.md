@@ -12,23 +12,30 @@ Note that the VoxelNet used in this project is not the same as that.
 To train the model you can use: 
 > python train.py &lt;dataroot&gt; &lt;iterations&gt; &lt;lastiteration&gt;
 
-and the dataset should arranged as:
+and the dataset should be arranged as:
 
-&lt;dataroot&gt; \
-|--ImageSets  \
-&emsp;|--train.txt # this .txt contains the samples' indices to be in training set \
-&emsp;|--val.txt # to be in validation set \
-|--training \
-&emsp;|--calib \
-&emsp;|--image_2 \
-&emsp;|--label_2 \
-&emsp;|--velodyne
+``````````
+<dataroot>
+|--ImageSets  
+    |--train.txt # this .txt contains the samples' indices to be in training set 
+    |--val.txt # to be in validation set 
+|--training 
+    |--calib 
+    |--image_2 
+    |--label_2 
+    |--velodyne
+````````````
 
 Before you train the model, use the following command to preprocess the data:
-> python cropdata.py &lt;dataroot&gt; &lt;mode&gt;
+> python cropdata.py &lt;dataroot&gt; &lt;mode&gt; \
+> python create_gtdatabase.py &lt;dataroot&gt;
 
 `cropdata.py` will create a folder `velodyne_croped` in 
 `<dataroot>/training`, and the training process will use
 the processed data.
 
 `mode` can be `numpy`, `torch`, `torch-cuda`, default `numpy`.
+
+`create_gtdatabase.py` will crop the ground truth samples out
+of original data, and save them in `<dataroot>/training/gtdatabase`.
+These data will be used in data augmentation.
