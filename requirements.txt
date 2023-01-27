@@ -7,3 +7,4 @@ opencv-python>=4.5.5
 ninja
 pyyaml
 numba
+open3d
