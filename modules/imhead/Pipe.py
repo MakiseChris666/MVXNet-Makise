@@ -1,22 +1,22 @@
-from torchvision.models.detection.faster_rcnn import fasterrcnn_resnet50_fpn
+from torchvision.models.detection.faster_rcnn import FasterRCNN_ResNet50_FPN_V2_Weights, fasterrcnn_resnet50_fpn_v2
 from torch import nn
 import torch
 from torch.nn import functional as f
 from modules import utils
 from modules.layers import FCN, CRB2d
 
+_fasterRCNN = fasterrcnn_resnet50_fpn_v2(weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
+
 class ImageFeatureExtractor(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.__fasterRCNN = fasterrcnn_resnet50_fpn(True)
-        self.__fasterRCNN.train(False)
-        for p in self.__fasterRCNN.parameters():
-            p.requires_grad = False
+        self.transform = _fasterRCNN.transform
+        self.backbone = _fasterRCNN.backbone
 
     def forward(self, x):
-        x, _ = self.__fasterRCNN.transform(x)
-        features = self.__fasterRCNN.backbone(x.tensors)
+        x, _ = self.transform(x)
+        features = self.backbone(x.tensors)
         features = [features['0'], features['1'], features['2']]
         return features
 

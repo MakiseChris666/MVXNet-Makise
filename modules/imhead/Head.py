@@ -6,6 +6,9 @@ class ImageHead(nn.Module):
     def __init__(self):
         super().__init__()
         self.extractor = ImageFeatureExtractor()
+        self.extractor.train(False)
+        for p in self.extractor.parameters():
+            p.requires_grad = False
         self.fusion = ImageFeatureFusion()
 
     def forward(self, x, voxels, calibs, imsize):
