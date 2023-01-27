@@ -23,6 +23,6 @@ class MVXNet(nn.Module):
         # actually it supports batchsize = 1 currently, so calibs = [calib_dict]
         # so voxels = (1, ...), it behaves the same as a single-element tuple so that's ok
         imfeatures = self.head(imgs, voxels, calibs, imsize) # (batch, N, T, 16)
-        voxels = torch.concat([voxels, imfeatures], dim = -1)
+        voxels = torch.concat([voxels[..., :7], imfeatures], dim = -1)
         x = self.backbone(voxels, idx)
         return x

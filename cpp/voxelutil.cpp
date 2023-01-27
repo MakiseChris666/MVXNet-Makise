@@ -92,9 +92,51 @@ float intersectArea(Point* ps1, int n1, Point* ps2, int n2) {
     return res;
 }
 
+Point r1[5], r2[5];
+auto bboxOverlap(array_t<float> bboxes1, array_t<float> bboxes2) {
+    array_t<float> res({ bboxes1.shape(0), bboxes2.shape(0) });
+    auto _res = res.mutable_unchecked<2>();
+    auto _b1 = bboxes1.unchecked<3>();
+    auto _b2 = bboxes2.unchecked<3>();
+    for (pyint i = 0; i < (const pyint)bboxes1.shape(0); i++) {
+        for (int j = 0; j < 4; j++) {
+            r1[j].x = _b1(i, j, 0), r1[j].y = _b1(i, j, 1);
+        }
+        float area1 = area(r1, 4);
+        for (pyint j = 0; j < (const pyint)bboxes2.shape(0); j++) {
+            for (int k = 0; k < 4; k++) {
+                r2[j].x = _b2(j, k, 0), r2[j].y = _b2(j, k, 1);
+            }
+            float area2 = area(r2, 4);
+            float inter = intersectArea(r1, 4, r2, 4);
+            _res(i, j) = inter / (area1 + area2 - inter);
+        }
+    }
+    return res;
+}
+
+auto bboxIntersection(array_t<float> bboxes1, array_t<float> bboxes2) {
+    array_t<float> res({ bboxes1.shape(0), bboxes2.shape(0) });
+    auto _res = res.mutable_unchecked<2>();
+    auto _b1 = bboxes1.unchecked<3>();
+    auto _b2 = bboxes2.unchecked<3>();
+    for (pyint i = 0; i < (const pyint)bboxes1.shape(0); i++) {
+        for (int j = 0; j < 4; j++) {
+            r1[j].x = _b1(i, j, 0), r1[j].y = _b1(i, j, 1);
+        }
+        for (pyint j = 0; j < (const pyint)bboxes2.shape(0); j++) {
+            for (int k = 0; k < 4; k++) {
+                r2[j].x = _b2(j, k, 0), r2[j].y = _b2(j, k, 1);
+            }
+            float inter = intersectArea(r1, 4, r2, 4);
+            _res(i, j) = inter;
+        }
+    }
+    return res;
+}
+
 auto classifyAnchors(array_t<float> gts, array_t<float> anchors, array_t<long long> nls, array_t<long long> nws,
     float negThr, float posThr) {
-    static Point r1[5], r2[5];
     int anchorsPerLoc = anchors.shape(2);
     auto _gts = gts.unchecked<3>();
     auto _anchors = anchors.unchecked<5>();
@@ -321,4 +363,6 @@ PYBIND11_MODULE(voxelutil, m) {
     m.doc() = "Some utility functions for VoxelNet";
     m.def("_classifyAnchors", &classifyAnchors);
     m.def("_group", &group);
+    m.def("bboxOverlap", &bboxOverlap);
+    m.def("bboxIntersection", &bboxIntersection);
 }

@@ -4,8 +4,6 @@ from modules.Extension import cpp
 from typing import Sequence, Union, List
 from numba import njit
 from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
-from numba.typed import Dict
-from numba import types
 import warnings
 
 warnings.simplefilter('ignore', category = NumbaDeprecationWarning)
@@ -74,9 +72,6 @@ def group_(pcd: np.ndarray, range: Sequence[float], size: Sequence[float], sampl
     voxel[..., 3:6] = voxel[..., :3] - center[:, None, :]
     return voxel, np.array(uidx).T
 
-floatArray2d = types.float64[:, :]
-intTriple = types.Tuple((types.int32, types.int32, types.int32))
-
 @njit
 def group(pcd: np.ndarray, range: List[float], size: List[float], samplesPerVoxel: int):
     """
@@ -85,7 +80,8 @@ def group(pcd: np.ndarray, range: List[float], size: List[float], samplesPerVoxe
     @param pcd: Point cloud
     @param range: Point cloud range
     @param size: Size of each voxel
-    @return: (voxel, indices), voxel in (N, 35, 7), indices in (N, 3)
+    @return: (voxel, indices), voxel in (N, 35, 9), indices in (N, 3), the last dim contains
+            7 encoded information and xy coordinates when points are projected to camera image
     """
     np.random.shuffle(pcd)
     pts = pcd[:, :3]
@@ -98,15 +94,15 @@ def group(pcd: np.ndarray, range: List[float], size: List[float], samplesPerVoxe
     for p, i in zip(pcd, idx):
         i = (i[0], i[1], i[2])
         if i not in mp:
-            mp[i] = np.zeros((samplesPerVoxel, 7))
+            mp[i] = np.zeros((samplesPerVoxel, 9))
             cnt[i] = 0
             keys.append(i)
         if cnt[i] < samplesPerVoxel:
             v = mp[i]
             c = cnt[i]
-            v[c, 0], v[c, 1], v[c, 2], v[c, 6] = p[0], p[1], p[2], p[3]
+            v[c, 0], v[c, 1], v[c, 2], v[c, 6], v[c, 7], v[c, 8] = p[0], p[1], p[2], p[3], p[4], p[5]
             cnt[i] += 1
-    voxel = np.empty((len(mp), samplesPerVoxel, 7))
+    voxel = np.empty((len(mp), samplesPerVoxel, 9))
     vcnt = np.empty(len(mp))
     uidx = np.empty((len(mp), 3))
     for i, k in enumerate(keys):

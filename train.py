@@ -6,11 +6,13 @@ import os
 import time
 from modules.Calc import bbox3d2bev, classifyAnchors
 from modules.data import Load as load, Preprocessing as pre
+from modules.augment.Augment import augmentTargetClasses
+from modules.augment.LoadGT import getAllGT
+from modules.utils import lidar2Img
 from MVXNet import MVXNet
 from modules.voxelnet import VoxelLoss
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-# from train_ import trainSingle
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
@@ -19,14 +21,30 @@ if len(sys.argv) > 1 and sys.argv[1] != '-':
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
 
-def cputask(data, anchorBevs):
-    pcd, img, gt, gtbev, calib = data
+def cputask(data, anchorBevs, gtwithinfo):
+    pcd, img, bbox2d, bbox3d, bev, calib = data
+    augpcd, augcalib, img, bbox3d, bev = augmentTargetClasses(pcd, img, bbox2d, bbox3d, bev, gtwithinfo, ['Car'], [12])
+    bbox3d = bbox3d['Car']
+    bev = bev['Car']
+    pcd = torch.Tensor(pcd)
+    proj = lidar2Img(pcd, calib, True)
+    proj = proj[:, [1, 0]]
+    pcd = torch.concat([pcd, proj], dim = 1)
+    pcd = pcd.numpy()
+    pcdxy = [pcd]
+    for ap, ac in zip(augpcd, augcalib):
+        proj = lidar2Img(ap, ac, True)
+        proj = proj[:, ::-1]
+        ap = np.concatenate([ap, proj], axis = 1)
+        pcdxy.append(ap)
+    pcd = np.concatenate(pcdxy, axis = 0)
+
     voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
-    if gt is not None:
-        pi, ni, gi = classifyAnchors(gtbev, gt[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
+    if bev is not None:
+        pi, ni, gi = classifyAnchors(bev, bbox3d[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
     else:
         pi, ni, gi, l = None, None, None, None
-    return voxel, idx, img, gt, gtbev, pi, ni, gi, calib
+    return voxel, idx, img, bbox3d, bev, pi, ni, gi, calib
 
 def train(processPool):
 
@@ -34,6 +52,7 @@ def train(processPool):
         trainSet = f.read().splitlines()
 
     trainDataSet = load.createDataset(trainSet)
+    gtwithinfo = getAllGT(['Car'])
 
     anchors = pre.createAnchors(cfg.voxelshape[0] // 2, cfg.voxelshape[1] // 2,
                                           cfg.velorange, cfg.carsize)
@@ -81,22 +100,22 @@ def train(processPool):
         if processPool is None:
             def process(data):
                 for d in data:
-                    yield cputask(d, anchorBevs)
+                    yield cputask(d, anchorBevs, gtwithinfo)
             processIter = process(trainDataSet)
         else:
-            preprocessed = [processPool.submit(cputask, data, anchorBevs) for data in trainDataSet]
+            preprocessed = [processPool.submit(cputask, data, anchorBevs, gtwithinfo) for data in trainDataSet]
             def process(futures):
                 for res in as_completed(futures):
                     yield res.result()
             processIter = process(preprocessed)
         for i, res in enumerate(processIter):
-            # shape = (N, 35, 7)
+            # shape = (N, 35, 9)
             voxel, idx, img, gt, gtbev, pi, ni, gi, calibCpu = res
             calib = {}
             for k in calibCpu.keys():
                 calib[k] = calibCpu[k].to(device)
 
-            # shape = (batch, N, 35, 7)
+            # shape = (batch, N, 35, 9)
             voxel = voxel[None, :]
             idx = np.concatenate([np.zeros((idx.shape[0], 1)), idx], axis = 1)
 

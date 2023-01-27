@@ -52,8 +52,7 @@ def featureMaping(voxels, features, calibs, imsize):
         origshape = v.shape[:-1]
         xyz = v[..., :3].reshape((-1, 3))
         zero = torch.all(xyz == 0, dim = 1)
-        proj = utils.lidar2Img(xyz, c, True)
-        proj = proj[:, [1, 0]]
+        proj = v[..., -2:].reshape((-1, 2))
         proj[zero] = 0
         imageFeatures = []
         zero = zero.reshape(origshape)

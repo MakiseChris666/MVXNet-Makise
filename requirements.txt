@@ -6,4 +6,4 @@ shapely
 opencv-python>=4.5.5
 ninja
 pyyaml
-numba<=0.53
+numba
