@@ -16,7 +16,7 @@ class VoxelNet(nn.Module):
     @staticmethod
     def reindex(x, idx):
         # input shape: x = (batch * N, 128), idx = (batch * N, 1 + 3)
-        res = Variable(torch.empty((1, 128, cfg.voxelshape[2], cfg.voxelshape[0]
+        res = Variable(torch.zeros((1, 128, cfg.voxelshape[2], cfg.voxelshape[0]
                                     , cfg.voxelshape[1]), dtype = cfg.dtype, device = cfg.device))
         res[idx[:, 0], :, idx[:, 3], idx[:, 1], idx[:, 2]] = x
         return res

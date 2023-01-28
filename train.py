@@ -159,13 +159,13 @@ def train(processPool):
                 lossTime += ed - st
 
             st = time.perf_counter()
-            # if cfg.half:
-            #     scaler.scale(loss).backward()
-            #     scaler.step(opt)
-            #     scaler.update()
-            # else:
-            loss.backward()
-            opt.step()
+            if cfg.half:
+                scaler.scale(loss).backward()
+                scaler.step(opt)
+                scaler.update()
+            else:
+                loss.backward()
+                opt.step()
             ed = time.perf_counter()
             backwardTime += ed - st
 
