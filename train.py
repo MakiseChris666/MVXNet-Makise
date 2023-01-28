@@ -13,9 +13,8 @@ from MVXNet import MVXNet
 from modules.voxelnet import VoxelLoss
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
-if cfg.half:
-    from torch.cuda.amp import autocast, GradScaler
-    scaler = GradScaler()
+from torch.cuda.amp import autocast, GradScaler
+scaler = GradScaler()
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
@@ -70,10 +69,7 @@ def train(processPool):
     criterion = criterion.to(device)
     imsize = torch.Tensor(cfg.imsize).to(device)
     if cfg.half:
-    #     model = model.half()
         anchors = anchors.half()
-    #     criterion = criterion.half()
-    #     imsize = imsize.half()
 
     forwardTime = 0
     lossTime = 0
@@ -137,10 +133,6 @@ def train(processPool):
                 img = torch.Tensor(img).to(device).permute(2, 0, 1) / 255
                 img = img[None, ...]
                 if cfg.half:
-                #     voxel = voxel.half()
-                #     img = img.half()
-                #     for k in calib.keys():
-                #         calib[k] = calib[k].half()
                     gt = gt.half()
                 score, reg = model(voxel, img, idx, [calib], imsize)
                 score = score.squeeze(dim = 0).permute(1, 2, 0)
