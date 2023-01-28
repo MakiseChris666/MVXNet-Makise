@@ -32,8 +32,8 @@ class VoxelLoss(nn.Module):
         alignedGTs = gts[gi]
         anchors = anchors.reshape((anchors.shape[0], anchors.shape[1], anchorsPerLoc, 7))
         alignedAnchors = anchors[pi]
-        d = torch.sqrt(alignedAnchors[:, 3] ** 2 + alignedAnchors[:, 4] ** 2)[:, None]
-        targets = torch.empty_like(alignedGTs, device = cfg.device)
+        d = torch.sqrt(alignedAnchors[:, 3] ** 2 + alignedAnchors[:, 4] ** 2)[:, None].type(cfg.dtype)
+        targets = torch.empty_like(alignedGTs, dtype = cfg.dtype, device = cfg.device)
         targets[:, [0, 1]] = (alignedGTs[:, [0, 1]] - alignedAnchors[:, [0, 1]]) / d
         targets[:, 2] = (alignedGTs[:, 2] - alignedAnchors[:, 2]) / alignedAnchors[:, 5]
         targets[:, 3:6] = torch.log(alignedGTs[:, 3:6] / alignedAnchors[:, 3:6])

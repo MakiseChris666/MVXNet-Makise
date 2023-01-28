@@ -1,5 +1,5 @@
 device: cuda
-half: True
+half: False
 velorange:
   - 0.0
   - -40.0

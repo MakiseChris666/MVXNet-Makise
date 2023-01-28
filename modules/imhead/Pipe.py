@@ -53,22 +53,21 @@ def featureMaping(voxels, features, calibs, imsize):
         xyz = v[..., :3].reshape((-1, 3))
         zero = torch.all(xyz == 0, dim = 1)
         proj = v[..., -2:].reshape((-1, 2))
-        proj = proj - cfg.eps # avoid precision problem
         proj[zero] = 0
         imageFeatures = []
         zero = zero.reshape(origshape)
         v[zero] = 0
 
         for feature, regionSize in zip(features, regionSizes):
-            index = proj / regionSize
-            index = index.long()
-            xi = proj[:, 0] - index[:, 0]       #
-            yi = proj[:, 1] - index[:, 1]       #
-            xi, yi = xi[None, :], yi[None, :]   # These are pre-calculated to
-            xi_, yi_ = 1 - xi, 1 - yi           # reduce calculation times
-            x, y = index[:, 0], index[:, 1]     #
-            xplus1 = index[:, 0] + 1            #
-            yplus1 = index[:, 1] + 1            #
+            indexNonaligned = proj / regionSize - cfg.eps
+            index = indexNonaligned.long()
+            xi = indexNonaligned[:, 0] - index[:, 0]        #
+            yi = indexNonaligned[:, 1] - index[:, 1]        #
+            xi, yi = xi[None, :], yi[None, :]               # These are pre-calculated to
+            xi_, yi_ = 1 - xi, 1 - yi                       # reduce calculation times
+            x, y = index[:, 0], index[:, 1]                 #
+            xplus1 = index[:, 0] + 1                        #
+            yplus1 = index[:, 1] + 1                        #
             assert torch.max(xplus1) < feature.shape[-2] and torch.max(yplus1) < feature.shape[-1]
             indexedFeature = feature[i, :, x, y] * xi * yi # shape = (C, S), S = proj.shape[0]
             indexedFeature = indexedFeature + feature[i, :, xplus1, y] * xi_ * yi

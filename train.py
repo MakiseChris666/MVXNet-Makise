@@ -13,6 +13,9 @@ from MVXNet import MVXNet
 from modules.voxelnet import VoxelLoss
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
+if cfg.half:
+    from torch.cuda.amp import autocast, GradScaler
+    scaler = GradScaler()
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
@@ -59,13 +62,18 @@ def train(processPool):
     anchorBevs = bbox3d2bev(anchors.reshape(anchors.shape[:2] + (-1, 7)))
     model = MVXNet()
     criterion = VoxelLoss()
-    opt = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.001)
+    opt = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.001, eps = cfg.eps)
     # torch.autograd.set_detect_anomaly(True)
 
     model = model.to(device)
     anchors = anchors.to(device)
     criterion = criterion.to(device)
     imsize = torch.Tensor(cfg.imsize).to(device)
+    if cfg.half:
+    #     model = model.half()
+        anchors = anchors.half()
+    #     criterion = criterion.half()
+    #     imsize = imsize.half()
 
     forwardTime = 0
     lossTime = 0
@@ -97,7 +105,7 @@ def train(processPool):
         random.shuffle(trainDataSet)
         clsLossSum, regLossSum = 0.0, 0.0
         maxClsLoss, maxRegLoss = 0.0, 0.0
-        regCnt = 0
+        clsCnt, regCnt = 0, 0
         if processPool is None:
             def process(data):
                 for d in data:
@@ -114,40 +122,56 @@ def train(processPool):
             voxel, idx, img, gt, gtbev, pi, ni, gi, calibCpu = res
             calib = {}
             for k in calibCpu.keys():
-                calib[k] = calibCpu[k].to(device)
+                calib[k] = torch.Tensor(calibCpu[k]).to(device)
 
             # shape = (batch, N, 35, 9)
             voxel = voxel[None, :]
             idx = np.concatenate([np.zeros((idx.shape[0], 1)), idx], axis = 1)
 
             opt.zero_grad()
-            st = time.perf_counter()
-            voxel = torch.Tensor(voxel).to(device)
-            idx = torch.LongTensor(idx).to(device)
-            img = torch.Tensor(img).to(device).permute(2, 0, 1) / 255
-            img = img[None, ...]
-            score, reg = model(voxel, img, idx, [calib], imsize)
-            score = score.squeeze(dim = 0).permute(1, 2, 0)
-            reg = reg.squeeze(dim = 0).permute(1, 2, 0)
-            ed = time.perf_counter()
-            forwardTime += ed - st
 
-            l = gt.to(device) if gt is not None else None
+            with autocast(dtype = cfg.dtype):
+                st = time.perf_counter()
+                voxel = torch.Tensor(voxel).to(device)
+                idx = torch.LongTensor(idx).to(device)
+                img = torch.Tensor(img).to(device).permute(2, 0, 1) / 255
+                img = img[None, ...]
+                if cfg.half:
+                #     voxel = voxel.half()
+                #     img = img.half()
+                #     for k in calib.keys():
+                #         calib[k] = calib[k].half()
+                    gt = gt.half()
+                score, reg = model(voxel, img, idx, [calib], imsize)
+                score = score.squeeze(dim = 0).permute(1, 2, 0)
+                reg = reg.squeeze(dim = 0).permute(1, 2, 0)
+                ed = time.perf_counter()
+                forwardTime += ed - st
+
+                l = gt.to(device) if gt is not None else None
+
+                st = time.perf_counter()
+                clsLoss, regLoss = criterion(pi, ni, gi, l, score, reg, anchors, 2)
+                loss = clsLoss
+                if not clsLoss.isnan():
+                    clsLossSum += clsLoss.item()
+                    maxClsLoss = max(maxClsLoss, clsLoss.item())
+                    clsCnt += 1
+                if regLoss is not None:
+                    loss = loss + regLoss
+                    if not regLoss.isnan():
+                        regLossSum += regLoss.item()
+                        maxRegLoss = max(maxRegLoss, regLoss.item())
+                        regCnt += 1
+                ed = time.perf_counter()
+                lossTime += ed - st
 
             st = time.perf_counter()
-            clsLoss, regLoss = criterion(pi, ni, gi, l, score, reg, anchors, 2)
-            loss = clsLoss
-            clsLossSum += clsLoss.item()
-            maxClsLoss = max(maxClsLoss, clsLoss.item())
-            if regLoss is not None:
-                loss = loss + regLoss
-                regLossSum += regLoss.item()
-                maxRegLoss = max(maxRegLoss, regLoss.item())
-                regCnt += 1
-            ed = time.perf_counter()
-            lossTime += ed - st
-
-            st = time.perf_counter()
+            # if cfg.half:
+            #     scaler.scale(loss).backward()
+            #     scaler.step(opt)
+            #     scaler.update()
+            # else:
             loss.backward()
             opt.step()
             ed = time.perf_counter()
@@ -162,6 +186,7 @@ def train(processPool):
                       % (clsLossSum / (i + 1), regLossSum / regCnt))
                 print('Max classfication loss: %.6f, Max regression loss: %.6f'
                       % (maxClsLoss, maxRegLoss))
+                # print('Non-nan classfication loss:', clsCnt, 'None-nan regression loss:', regCnt)
             epoched = time.perf_counter()
             allTime = epoched - epochst
 
@@ -171,8 +196,6 @@ def train(processPool):
 if __name__ == '__main__':
     if cfg.numthreads != -1:
         torch.set_num_threads(cfg.numthreads)
-    if cfg.half:
-        torch.set_default_tensor_type(torch.HalfTensor)
     if cfg.multiprocess > 0:
         with ProcessPoolExecutor(cfg.multiprocess) as pool:
             train(pool)
