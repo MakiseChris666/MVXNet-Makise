@@ -8,3 +8,4 @@ ninja
 pyyaml
 numba
 open3d
+pycocotools
