@@ -1,9 +1,9 @@
 import random
-from modules import Config as cfg
-import sys
+import modules.config as cfg
 import torch
 import os
 import time
+from modules.config import options, args
 from modules.Calc import bbox3d2bev, classifyAnchors
 from modules.data import Load as load, Preprocessing as pre
 from modules.augment.Augment import augmentTargetClasses
@@ -18,8 +18,8 @@ scaler = GradScaler()
 
 device = cfg.device
 dataroot = '../mmdetection3d-master/data/kitti'
-if len(sys.argv) > 1 and sys.argv[1] != '-':
-    dataroot = sys.argv[1]
+if len(args) > 0:
+    dataroot = args[0]
 trainInfoPath = os.path.join(dataroot, 'ImageSets/train.txt')
 testInfoPath = os.path.join(dataroot, 'ImageSets/val.txt')
 
@@ -42,7 +42,7 @@ def cputask(data, anchorBevs, gtwithinfo):
     pcd = np.concatenate(pcdxy, axis = 0)
 
     voxel, idx = pre.group(pcd, cfg.velorange, cfg.voxelsize, cfg.samplenum)
-    if bev is not None:
+    if bev.shape[0] != 0:
         pi, ni, gi = classifyAnchors(bev, bbox3d[:, [0, 1]], anchorBevs, cfg.velorange, 0.45, 0.6)
     else:
         pi, ni, gi, l = None, None, None, None
@@ -76,17 +76,11 @@ def train(processPool):
     backwardTime = 0
     allTime = 0
 
-    if len(sys.argv) > 2:
-        iterations = int(sys.argv[2])
-    else:
-        iterations = 10
-
     if not os.path.exists('./checkpoints'):
         os.mkdir('./checkpoints')
 
-    lastiter = 0
-    if len(sys.argv) > 3:
-        lastiter = int(sys.argv[3])
+    iterations = options.numepochs
+    lastiter = options.lastiter
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
         opt.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}_opt.pkl'))

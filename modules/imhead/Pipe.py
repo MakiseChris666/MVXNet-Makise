@@ -3,7 +3,7 @@ from torch import nn
 import torch
 from torch.nn import functional as f
 from modules.layers import FCN, CRB2d
-import modules.Config as cfg
+import modules.config as cfg
 
 _fasterRCNN = fasterrcnn_resnet50_fpn_v2(weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
 

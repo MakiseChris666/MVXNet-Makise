@@ -1,16 +1,17 @@
 from typing import List, Tuple, Dict
 import os
-import sys
 import modules.data.Preprocessing as pre
 import torch
 import numpy as np
 import pandas as pd
-from modules import Calc, Config as cfg
+from modules import Calc
+import modules.config as cfg
+from modules.config import args
 import cv2 as cv
 
 dataroot = '../mmdetection3d-master/data/kitti'
-if len(sys.argv) > 1 and sys.argv[1] != '-' and sys.argv[1] != '-f':
-    dataroot = sys.argv[1]
+if len(args) > 0:
+    dataroot = args[0]
 veloroot = os.path.join(dataroot, 'training/velodyne_croped')
 labelroot = os.path.join(dataroot, 'training/label_2')
 calibroot = os.path.join(dataroot, 'training/calib')

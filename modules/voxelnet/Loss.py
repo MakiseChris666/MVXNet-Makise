@@ -1,7 +1,7 @@
 from torch import nn
 import torch
 from torch.nn import SmoothL1Loss
-from modules import Config as cfg
+import modules.config as cfg
 
 class VoxelLoss(nn.Module):
 

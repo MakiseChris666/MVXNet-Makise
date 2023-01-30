@@ -1,10 +1,8 @@
 import numpy as np
 import os
 import sys
-
 import torch
-
-from modules import Config as cfg
+import modules.config as cfg
 from modules.data import Preprocessing as pre
 
 dataroot = '../mmdetection3d-master/data/kitti'

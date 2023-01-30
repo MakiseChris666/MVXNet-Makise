@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.autograd import Variable
-from modules import Config as cfg
+import modules.config as cfg
 from modules.voxelnet import Pipe
 
 class VoxelNet(nn.Module):

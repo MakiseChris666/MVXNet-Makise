@@ -1,5 +1,5 @@
 import numpy as np
-import modules.Config as cfg
+import modules.config as cfg
 from numba import njit
 from typing import Tuple, List
 from modules.Calc import bbox3d2bev

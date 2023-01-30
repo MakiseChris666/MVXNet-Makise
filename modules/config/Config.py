@@ -11,6 +11,3 @@ if config['half']:
 else:
     config['eps'] = 1e-6
     config['dtype'] = torch.float32
-
-def __getattr__(name):
-    return config[name]

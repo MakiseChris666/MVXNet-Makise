@@ -1,13 +1,13 @@
 import pickle as pkl
 import os
-import sys
 import numpy as np
 import cv2 as cv
 from modules.data.Load import readCalib
+from modules.config import args
 
 dataroot = '../mmdetection3d-master/data/kitti'
-if len(sys.argv) > 1 and sys.argv[1] != '-' and sys.argv[1] != '-f':
-    dataroot = sys.argv[1]
+if len(args) > 0:
+    dataroot = args[0]
 calibroot = os.path.join(dataroot, 'training/calib')
 
 def readGTInfo():

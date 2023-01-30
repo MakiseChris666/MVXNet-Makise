@@ -12,7 +12,7 @@ import pandas as pd
 import torch
 from modules.Calc import bboxCam2Lidar, bbox3d2corner
 import pickle as pkl
-from modules import Config as cfg
+import modules.config as cfg
 
 def polys_to_mask(polygons, height, width):
     """

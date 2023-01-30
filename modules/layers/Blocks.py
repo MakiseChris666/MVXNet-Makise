@@ -1,6 +1,6 @@
 from torch import nn
 from torch.nn import functional as f
-from modules import Config as cfg
+import modules.config as cfg
 
 class FCN(nn.Module):
 
