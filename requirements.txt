@@ -1,0 +1,11 @@
+numpy
+pandas
+torch>=1.12.1
+torchvision
+shapely
+opencv-python>=4.5.5
+ninja
+pyyaml
+numba
+open3d
+pycocotools

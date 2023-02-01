@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+Test.py
+checkpoints/
+check.py
+Utils.py
+*__pycache__*
+/Test2.py
+/.ipynb_checkpoints/
+/benchmark.ipynb
+/train_.py
+/Test3.py
+/Test4.py
+/seglabel/
+/Test5.py
