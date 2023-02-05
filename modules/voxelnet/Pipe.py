@@ -1,12 +1,13 @@
 from torch import nn
 import torch
-from modules.layers import FCN, CRB2d, CRB3d, DeCRB2d
+# from modules.layers import FCRB, CRB2d, CRB3d, DeCRB2d
+from modules.layers import FCBR, CBR2d, CBR3d, DeCBR2d
 
 class VFE(nn.Module):
 
     def __init__(self, cin, cout, sampleNum):
         super().__init__()
-        self.fcn = FCN(cin, cout, bias = False)
+        self.fcn = FCBR(cin, cout)
         self.sampleNum = sampleNum
 
     def forward(self, x):
@@ -32,9 +33,9 @@ class CML(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.conv1 = CRB3d(128, 64, 3, (2, 1, 1), (1, 1, 1))
-        self.conv2 = CRB3d(64, 64, 3, 1, (0, 1, 1))
-        self.conv3 = CRB3d(64, 64, 3, (2, 1, 1), 1)
+        self.conv1 = CBR3d(128, 64, 3, (2, 1, 1), (1, 1, 1))
+        self.conv2 = CBR3d(64, 64, 3, 1, (0, 1, 1))
+        self.conv3 = CBR3d(64, 64, 3, (2, 1, 1), 1)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -47,21 +48,21 @@ class RPN(nn.Module):
     def __init__(self):
         super().__init__()
         self.blk1 = nn.Sequential(
-            CRB2d(128, 128, 3, 2, 1),
-            *[CRB2d(128, 128, 3, 1, 1) for _ in range(3)]
+            CBR2d(128, 128, 3, 2, 1),
+            *[CBR2d(128, 128, 3, 1, 1) for _ in range(3)]
         )
         self.blk2 = nn.Sequential(
-            CRB2d(128, 128, 3, 2, 1),
-            *[CRB2d(128, 128, 3, 1, 1) for _ in range(5)]
+            CBR2d(128, 128, 3, 2, 1),
+            *[CBR2d(128, 128, 3, 1, 1) for _ in range(5)]
         )
         self.blk3 = nn.Sequential(
-            CRB2d(128, 256, 3, 2, 1),
-            *[CRB2d(256, 256, 3, 1, 1) for _ in range(5)]
+            CBR2d(128, 256, 3, 2, 1),
+            *[CBR2d(256, 256, 3, 1, 1) for _ in range(5)]
         )
-        self.deconv1 = DeCRB2d(128, 256, 3, 1, 1)
-        self.deconv2 = DeCRB2d(128, 256, 2, 2, 0)
-        self.deconv3 = DeCRB2d(256, 256, 4, 4, 0)
-        self.cls = nn.Conv2d(768, 2, 1, 1, 0)
+        self.deconv1 = DeCBR2d(128, 256, 3, 1, 1)
+        self.deconv2 = DeCBR2d(128, 256, 2, 2, 0)
+        self.deconv3 = DeCBR2d(256, 256, 4, 4, 0)
+        self.cls = nn.Conv2d(768, 4, 1, 1, 0)
         self.reg = nn.Conv2d(768, 14, 1, 1, 0)
 
     def forward(self, x):
@@ -72,4 +73,4 @@ class RPN(nn.Module):
         dx2 = self.deconv2(x2)
         dx3 = self.deconv3(x3)
         x = torch.concat([dx1, dx2, dx3], dim = 1)
-        return torch.sigmoid(self.cls(x)), self.reg(x)
+        return self.cls(x), self.reg(x)

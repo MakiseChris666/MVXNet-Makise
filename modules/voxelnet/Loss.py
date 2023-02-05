@@ -2,6 +2,7 @@ from torch import nn
 import torch
 from torch.nn import SmoothL1Loss
 import modules.config as cfg
+import torch.nn.functional as f
 
 class VoxelLoss(nn.Module):
 
@@ -14,12 +15,17 @@ class VoxelLoss(nn.Module):
 
     def forward(self, pi, ni, gi, gts, score, reg, anchors, anchorsPerLoc):
 
+        score = score.reshape((176, 200, 2, 2))
+        score = f.softmax(score, dim = -1)
+        pos = score[..., 0]
+        neg = score[..., 1]
+
         if pi is None:
-            clsLoss = -torch.log(1 - score + self.eps).mean()
+            clsLoss = -torch.log(neg + self.eps).mean()
             return clsLoss, None
 
-        posLoss = -torch.log(score[pi] + self.eps).sum()
-        negLoss = -torch.log(1 - score + self.eps)
+        posLoss = -torch.log(pos[pi] + self.eps).sum()
+        negLoss = -torch.log(neg + self.eps)
         sizeSum = negLoss.shape[0] * negLoss.shape[1] * negLoss.shape[2]
         negLoss = negLoss.sum() - negLoss[ni].sum()
         posLoss = posLoss / (pi[0].shape[0] + self.eps)

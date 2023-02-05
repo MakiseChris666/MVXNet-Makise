@@ -15,6 +15,7 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from torch.amp import autocast
 from torch import nn
+from torch.optim.lr_scheduler import MultiStepLR
 
 device = cfg.device
 if cfg.half:
@@ -65,7 +66,10 @@ def train(processPool):
     model = MVXNet()
     model.apply(initWeights)
     criterion = VoxelLoss()
-    opt = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()), lr = 0.01, eps = cfg.eps)
+    opt = torch.optim.AdamW(filter(lambda p: p.requires_grad, model.parameters()),
+                            lr = 1e-3, weight_decay = 0.1, eps = cfg.eps)
+    # for p in opt.param_groups:
+    #     p['initial_lr'] = 0.01
     # torch.autograd.set_detect_anomaly(True)
 
     model = model.to(device)
@@ -84,6 +88,8 @@ def train(processPool):
 
     iterations = options.numepochs
     lastiter = options.lastiter
+    # scheduler = MultiStepLR(opt, [4, 30], 0.1, lastiter)
+    # scheduler.step()
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
         opt.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}_opt.pkl'))
@@ -95,6 +101,7 @@ def train(processPool):
 
     epochst = time.perf_counter()
     for epoch in range(iterations):
+        # print(scheduler.get_lr())
         random.shuffle(trainDataSet)
         clsLossSum, regLossSum = 0.0, 0.0
         maxClsLoss, maxRegLoss = 0.0, 0.0
@@ -180,13 +187,14 @@ def train(processPool):
                       % (maxClsLoss, maxRegLoss))
                 if i + 1 == len(trainSet):
                     with open('./checkpoints/log.txt', 'a+') as logf:
-                        print(f'Epoch {epoch + 1}:', file = logf)
+                        print(f'Epoch {epoch + lastiter + 1}:', file = logf)
                         print('Avg classfication loss: %.6f, Avg regression loss: %.6f'
                               % (clsLossSum / clsCnt, regLossSum / regCnt), file = logf)
                         print('Max classfication loss: %.6f, Max regression loss: %.6f'
                               % (maxClsLoss, maxRegLoss), file = logf)
                 # print('Non-nan classfication loss:', clsCnt, 'None-nan regression loss:', regCnt)
 
+        # scheduler.step()
         torch.save(model.state_dict(), f'./checkpoints/epoch{epoch + lastiter + 1}.pkl')
         torch.save(opt.state_dict(), f'./checkpoints/epoch{epoch + lastiter + 1}_opt.pkl')
 

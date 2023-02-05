@@ -2,7 +2,7 @@ from torch import nn
 from torch.nn import functional as f
 import modules.config as cfg
 
-class FCN(nn.Module):
+class FCRB(nn.Module):
 
     def __init__(self, cin, cout, bias = True):
         super().__init__()
@@ -49,3 +49,51 @@ class DeCRB2d(nn.Module):
     def forward(self, x):
         x = f.relu(self.deconv(x))
         return self.bn(x)
+
+class FCBR(nn.Module):
+
+    def __init__(self, cin, cout, bias = True):
+        super().__init__()
+        self.fc = nn.Linear(cin, cout, bias = bias)
+        self.bn = nn.BatchNorm2d(cout, eps = cfg.eps, affine = cfg.bnaffine, track_running_stats = cfg.bntrack)
+
+    def forward(self, x):
+        # input shape = (batch, h, w, c)
+        x = self.fc(x)
+        x = x.permute(0, 3, 1, 2)
+        x = f.relu(self.bn(x))
+        # after BN: (batch, c, h, w)
+        return x.permute(0, 2, 3, 1)
+
+class CBR3d(nn.Module):
+
+    def __init__(self, cin, cout, k, s, p):
+        super().__init__()
+        self.conv = nn.Conv3d(cin, cout, k, s, p)
+        self.bn = nn.BatchNorm3d(cout, eps = cfg.eps, affine = cfg.bnaffine, track_running_stats = cfg.bntrack)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return f.relu(self.bn(x))
+
+class CBR2d(nn.Module):
+
+    def __init__(self, cin, cout, k, s, p):
+        super().__init__()
+        self.conv = nn.Conv2d(cin, cout, k, s, p)
+        self.bn = nn.BatchNorm2d(cout, eps = cfg.eps, affine = cfg.bnaffine, track_running_stats = cfg.bntrack)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return f.relu(self.bn(x))
+
+class DeCBR2d(nn.Module):
+
+    def __init__(self, cin, cout, k, s, p):
+        super().__init__()
+        self.deconv = nn.ConvTranspose2d(cin, cout, k, s, p)
+        self.bn = nn.BatchNorm2d(cout, eps = cfg.eps, affine = cfg.bnaffine, track_running_stats = cfg.bntrack)
+
+    def forward(self, x):
+        x = self.deconv(x)
+        return f.relu(self.bn(x))

@@ -9,7 +9,7 @@ class VoxelNet(nn.Module):
     def __init__(self):
         super().__init__()
         self.svfe = Pipe.SVFE(cfg.samplenum)
-        self.fcn = Pipe.FCN(128, 128)
+        self.fcn = Pipe.FCBR(128, 128)
         self.cml = Pipe.CML()
         self.rpn = Pipe.RPN()
 
