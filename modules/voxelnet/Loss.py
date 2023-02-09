@@ -24,8 +24,8 @@ class VoxelLoss(nn.Module):
             clsLoss = -torch.log(neg + self.eps).mean()
             return clsLoss, None
 
-        posLoss = -torch.log(pos[pi] + self.eps).sum()
-        negLoss = -torch.log(neg + self.eps)
+        posLoss = -(torch.log(pos[pi] + self.eps) * (1 - pos[pi])).sum()
+        negLoss = -torch.log(neg + self.eps) * (1 - neg)
         sizeSum = negLoss.shape[0] * negLoss.shape[1] * negLoss.shape[2]
         negLoss = negLoss.sum() - negLoss[ni].sum()
         posLoss = posLoss / (pi[0].shape[0] + self.eps)

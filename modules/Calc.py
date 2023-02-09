@@ -3,6 +3,7 @@ import torch
 import numpy as np
 from .Extension import cpp
 from typing import Sequence, Tuple, Union
+from torchvision.ops.boxes import box_iou
 
 index3d = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
 
@@ -59,6 +60,14 @@ def bbox3d2corner(bbox3ds: torch.Tensor) -> torch.Tensor:
         res = res[0]
     return res
 
+def bbox3dAxisAlign(bbox3ds: torch.Tensor) -> torch.Tensor:
+    r = torch.abs(bbox3ds[..., 6])
+    horizontal = ((r > torch.pi / 4) & (r < torch.pi * 3 / 4))[..., None]
+    bbox2d = bbox3ds[..., [0, 1, 3, 4]]
+    bbox2d[..., 2:] = bbox2d[..., 2:] + bbox2d[..., :2]
+    res = torch.where(horizontal, bbox2d[..., [0, 1, 3, 2]], bbox2d)
+    return res
+
 def iou2d(rs1: Sequence[Polygon], rs2: Sequence[Polygon]):
     """
     Compute pairwise iou between every box in rs1 and rs2
@@ -84,6 +93,19 @@ def getPolygons(bboxes):
     for i, p in enumerate(bboxes):
         res[i] = Polygon(p)
     return res
+
+def classifyAnchorsAlignedGT(gtsXYXY: torch.Tensor, anchorsXYXY: torch.Tensor, negThr: float, posThr: float):
+    assert gtsXYXY.shape[-1] == anchorsXYXY.shape[-1] and gtsXYXY.shape[-1] == 4
+    anchorShape = anchorsXYXY.shape
+    anchorsXYXY = anchorsXYXY.reshape((-1, 4))
+    ious = box_iou(anchorsXYXY, gtsXYXY)
+    maxious, indices = torch.max(ious, dim = 1)
+    pos = maxious > posThr
+    nonneg = maxious > negThr
+    gi = indices[pos]
+    pi = torch.where(pos.reshape(anchorShape[:-1]))
+    ni = torch.where(nonneg.reshape(anchorShape[:-1]))
+    return pi, ni, gi
 
 def classifyAnchors(gts: torch.Tensor, gtCenters: torch.Tensor, anchors: torch.Tensor,
                     velorange: Sequence[float], negThr: float, posThr: float)\

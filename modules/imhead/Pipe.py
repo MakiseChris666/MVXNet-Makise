@@ -86,20 +86,16 @@ class ImageFeatureFusion(nn.Module):
     def __init__(self):
         super().__init__()
         self.fcn1 = FCRB(768, 768)
-        self.conv1 = CRB2d(768, 128, 1, 1, 0)
-        self.fcn2 = FCRB(128, 128)
-        self.conv2 = CRB2d(128, 16, 1, 1, 0)
-        self.fcn3 = FCRB(16, 16)
+        self.fcn2 = FCRB(768, 128)
+        self.fcn3 = FCRB(128, 128)
+        self.fcn4 = FCRB(128, 16)
+        self.fcn5 = FCRB(16, 16)
 
     def forward(self, x):
         # input shape = (batch, N, T, C), C = 768
         x = self.fcn1(x)
-        x = x.permute(0, 3, 1, 2)
-        x = self.conv1(x)
-        x = x.permute(0, 2, 3, 1)
         x = self.fcn2(x)
-        x = x.permute(0, 3, 1, 2)
-        x = self.conv2(x)
-        x = x.permute(0, 2, 3, 1)
         x = self.fcn3(x)
+        x = self.fcn4(x)
+        x = self.fcn5(x)
         return x
