@@ -6,6 +6,7 @@ from typing import Sequence, Tuple, Union
 from torchvision.ops.boxes import box_iou
 
 index3d = Tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+emptyIndex3d = (torch.LongTensor([]), torch.LongTensor([]), torch.LongTensor([]))
 
 def getRotationMatrices(r: torch.Tensor):
     rcos = torch.cos(r).reshape((-1, 1))
@@ -64,8 +65,10 @@ def bbox3dAxisAlign(bbox3ds: torch.Tensor) -> torch.Tensor:
     r = torch.abs(bbox3ds[..., 6])
     horizontal = ((r > torch.pi / 4) & (r < torch.pi * 3 / 4))[..., None]
     bbox2d = bbox3ds[..., [0, 1, 3, 4]]
-    bbox2d[..., 2:] = bbox2d[..., 2:] + bbox2d[..., :2]
-    res = torch.where(horizontal, bbox2d[..., [0, 1, 3, 2]], bbox2d)
+    bbox2d = torch.where(horizontal, bbox2d[..., [0, 1, 3, 2]], bbox2d)
+    res = torch.empty_like(bbox2d)
+    res[..., :2] = bbox2d[..., :2] - bbox2d[..., 2:] / 2
+    res[..., 2:] = bbox2d[..., :2] + bbox2d[..., 2:] / 2
     return res
 
 def iou2d(rs1: Sequence[Polygon], rs2: Sequence[Polygon]):
@@ -110,6 +113,8 @@ def classifyAnchorsAlignedGT(gtsXYXY: torch.Tensor, anchorsXYXY: torch.Tensor, n
 def classifyAnchors(gts: torch.Tensor, gtCenters: torch.Tensor, anchors: torch.Tensor,
                     velorange: Sequence[float], negThr: float, posThr: float)\
                     -> Tuple[index3d, index3d, torch.Tensor]:
+    if gts is None:
+        return emptyIndex3d, emptyIndex3d, torch.LongTensor([])
     l = (velorange[3] - velorange[0]) / anchors.shape[0]
     w = (velorange[4] - velorange[1]) / anchors.shape[1]
     nls = ((gtCenters[:, 0] - velorange[0] - l / 2) / l + 0.5).long()
@@ -244,7 +249,8 @@ def bboxCam2Lidar(camBoxes: Union[torch.Tensor, np.ndarray], c2v: Union[torch.Te
     xyz = xyz.T
     camBoxes[:, 3:6] = camBoxes[:, [2, 1, 0]]
     camBoxes[:, :3] = xyz[:, :3]
-    camBoxes[:, 6] = camBoxes[:, 6] - 0.5 * torch.pi
+    camBoxes[:, 6] = -camBoxes[:, 6] - 0.5 * torch.pi
+    camBoxes[:, 6] = torch.where(camBoxes[:, 6] < -torch.pi, camBoxes[:, 6] + 2 * torch.pi, camBoxes[:, 6])
     return camBoxes
 
 def decodeRegression(regmap: torch.Tensor, anchors: torch.Tensor) -> torch.Tensor:
@@ -254,5 +260,5 @@ def decodeRegression(regmap: torch.Tensor, anchors: torch.Tensor) -> torch.Tenso
     res[..., :2] = regmap[..., :2] * d + anchors[..., :2]
     res[..., 2] = regmap[..., 2] * anchors[..., 5] + anchors[..., 2]
     res[..., 3:6] = torch.exp(regmap[..., 3:6]) * anchors[..., 3:6]
-    res[..., 6] = regmap[..., 6] + anchors[..., 6]
+    res[..., 6] = torch.arcsin(regmap[..., 6]) + anchors[..., 6]
     return res

@@ -1,5 +1,7 @@
 device: cuda
-half: True
+half: False
+sparsemiddle: True # Should install spconv package first
+augment: True
 velorange:
   - 0.0
   - -40.0

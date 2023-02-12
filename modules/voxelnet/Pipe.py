@@ -43,6 +43,32 @@ class CML(nn.Module):
         x = self.conv3(x)
         return x
 
+try:
+    from modules.layers import SparseCRB3d
+    import spconv.pytorch as spconv
+    class SparseCML(nn.Module):
+
+        def __init__(self):
+            super().__init__()
+            self.subm1 = SparseCRB3d('subm', 128, 64, 3, 1, 1, bias = False)
+            self.conv1 = SparseCRB3d('sparse', 64, 64, (3, 1, 1), (2, 1, 1), (1, 0, 0), bias = False)
+            self.subm2 = SparseCRB3d('subm', 64, 64, 3, 1, 1, bias = False)
+            self.subm3 = SparseCRB3d('subm', 64, 64, 3, 1, 1, bias = False)
+            self.conv2 = SparseCRB3d('sparse', 64, 64, (3, 1, 1), (2, 1, 1), 0, bias = False)
+
+        def forward(self, x):
+            if not isinstance(x, spconv.SparseConvTensor):
+                x = spconv.SparseConvTensor.from_dense(x)
+            x = self.subm1(x)
+            x = self.conv1(x)
+            x = self.subm2(x)
+            x = self.subm3(x)
+            x = self.conv2(x)
+            return x.dense()
+
+except ImportError:
+    pass
+
 class RPN(nn.Module):
 
     def __init__(self):
@@ -62,8 +88,9 @@ class RPN(nn.Module):
         self.deconv1 = DeCBR2d(128, 256, 3, 1, 1)
         self.deconv2 = DeCBR2d(128, 256, 2, 2, 0)
         self.deconv3 = DeCBR2d(256, 256, 4, 4, 0)
-        self.cls = nn.Conv2d(768, 4, 1, 1, 0)
+        self.cls = nn.Conv2d(768, 2, 1, 1, 0)
         self.reg = nn.Conv2d(768, 14, 1, 1, 0)
+        self.dir = nn.Conv2d(768, 4, 1, 1, 0)
 
     def forward(self, x):
         x1 = self.blk1(x)
@@ -73,4 +100,4 @@ class RPN(nn.Module):
         dx2 = self.deconv2(x2)
         dx3 = self.deconv3(x3)
         x = torch.concat([dx1, dx2, dx3], dim = 1)
-        return self.cls(x), self.reg(x)
+        return self.cls(x), self.reg(x), self.dir(x)
