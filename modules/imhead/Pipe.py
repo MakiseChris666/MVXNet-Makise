@@ -2,7 +2,7 @@ from torchvision.models.detection.faster_rcnn import FasterRCNN_ResNet50_FPN_V2_
 from torch import nn
 import torch
 from torch.nn import functional as f
-from modules.layers import FCRB, CRB2d
+from modules.layers import FCRB
 import modules.config as cfg
 
 _fasterRCNN = fasterrcnn_resnet50_fpn_v2(weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
@@ -17,7 +17,7 @@ class ImageFeatureExtractor(nn.Module):
     def forward(self, x):
         x, _ = self.transform(x)
         features = self.backbone(x.tensors)
-        features = [features['0'], features['1'], features['2']]
+        features = [features['0'], features['1'], features['2'], features['3']]
         return features
 
 def featureMaping(voxels, features, calibs, imsize):
@@ -85,17 +85,13 @@ class ImageFeatureFusion(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.fcn1 = FCRB(768, 768)
-        self.fcn2 = FCRB(768, 128)
-        self.fcn3 = FCRB(128, 128)
-        self.fcn4 = FCRB(128, 16)
-        self.fcn5 = FCRB(16, 16)
+        self.fcn1 = FCRB(1024, 128)
+        self.fcn2 = FCRB(128, 16)
+        self.fcn3 = FCRB(16, 16)
 
     def forward(self, x):
         # input shape = (batch, N, T, C), C = 768
         x = self.fcn1(x)
         x = self.fcn2(x)
         x = self.fcn3(x)
-        x = self.fcn4(x)
-        x = self.fcn5(x)
         return x

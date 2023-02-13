@@ -11,7 +11,7 @@ class VoxelLoss(nn.Module):
         super().__init__()
         self.eps = eps
         self.lossWeights = lossWeights
-        self.smoothl1 = SmoothL1Loss()
+        self.smoothl1 = SmoothL1Loss(beta = 1.0 / 9.0)
         self.entropy = CrossEntropyLoss()
 
     def forward(self, pi, ni, gi, gts, score, reg, dir, anchors, anchorsPerLoc):
@@ -44,15 +44,17 @@ class VoxelLoss(nn.Module):
         anchors = anchors.reshape((anchors.shape[0], anchors.shape[1], anchorsPerLoc, 7))
         alignedAnchors = anchors[pi]
         d = torch.sqrt(alignedAnchors[:, 3] ** 2 + alignedAnchors[:, 4] ** 2)[:, None].type(cfg.dtype)
-        targets = torch.empty_like(alignedGTs, dtype = cfg.dtype, device = cfg.device)
+        targets = torch.empty((alignedGTs.shape[0], 6), dtype = cfg.dtype, device = cfg.device)
         targets[:, [0, 1]] = (alignedGTs[:, [0, 1]] - alignedAnchors[:, [0, 1]]) / d
         targets[:, 2] = (alignedGTs[:, 2] - alignedAnchors[:, 2]) / alignedAnchors[:, 5]
         targets[:, 3:6] = torch.log(alignedGTs[:, 3:6] / alignedAnchors[:, 3:6])
-        targets[:, 6] = torch.sin(alignedGTs[:, 6] - alignedAnchors[:, 6])
+        # targets[:, 6] = torch.sin(alignedGTs[:, 6] - alignedAnchors[:, 6])
         dirpos = alignedGTs[:, 6] > 0
 
         reg = reg.reshape((reg.shape[0], reg.shape[1], anchorsPerLoc, 7))[pi]
-        regLoss = self.smoothl1(reg, targets)
+        regLoss = self.smoothl1(reg[:, :6], targets) + \
+                  self.smoothl1(torch.sin(reg[:, 6] - alignedGTs[:, 6]),
+                                torch.zeros(reg.shape[0], dtype = cfg.dtype, device = cfg.device))
 
         dir = dir[pi]
         dirTar = torch.zeros_like(dir, dtype = cfg.dtype, device = cfg.device)

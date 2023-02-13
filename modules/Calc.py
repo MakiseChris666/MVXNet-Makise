@@ -232,8 +232,8 @@ def classifyAnchors_(gts, gtCenters, anchors, velorange, negThr, posThr):
 
 def bboxCam2Lidar(camBoxes: Union[torch.Tensor, np.ndarray], c2v: Union[torch.Tensor, np.ndarray], inplace: bool = False):
     """
-
-    @param inplace:
+    Conver hwlxyzr format camera bboxes to xyzlwhr format lidar bboxes.
+    @param inplace: Default False
     @param camBoxes: (N, 7) in 'hwlxyzr'
     @param c2v: (4, 4). Let v2c be calibration matrix 'Tr_velo_to_cam', which is in shape (3, 4),
     than c2v = np.linalg.inv(np.concatenate([v2c, [[0, 0, 0, 1]]], axis = 0))
@@ -252,6 +252,23 @@ def bboxCam2Lidar(camBoxes: Union[torch.Tensor, np.ndarray], c2v: Union[torch.Te
     camBoxes[:, 6] = -camBoxes[:, 6] - 0.5 * torch.pi
     camBoxes[:, 6] = torch.where(camBoxes[:, 6] < -torch.pi, camBoxes[:, 6] + 2 * torch.pi, camBoxes[:, 6])
     return camBoxes
+
+def bboxLidar2Cam(lidarBoxes: torch.Tensor, v2c: torch.Tensor, inplace: bool = False):
+    res: torch.Tensor
+    if inplace:
+        res = lidarBoxes
+    else:
+        res = torch.empty_like(lidarBoxes)
+        res[...] = lidarBoxes
+    xyz = res[:, :3]
+    xyz = torch.concat([xyz, torch.ones((res.shape[0], 1))], dim = 1).T
+    xyz = v2c @ xyz
+    xyz = xyz.T
+    res[:, :3] = res[:, [5, 4, 3]]
+    res[:, 3:6] = xyz[:, :3]
+    res[:, 6] = -res[:, 6] - 0.5 * torch.pi
+    res[:, 6] = torch.where(res[:, 6] < -torch.pi, res[:, 6] + 2 * torch.pi, res[:, 6])
+    return res
 
 def decodeRegression(regmap: torch.Tensor, anchors: torch.Tensor) -> torch.Tensor:
     assert regmap.shape == anchors.shape

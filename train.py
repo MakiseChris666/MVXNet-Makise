@@ -5,7 +5,7 @@ import os
 import time
 import contextlib
 from modules.config import options, trainInfoPath
-from modules.Calc import bbox3d2bev, classifyAnchors, classifyAnchorsAlignedGT, bbox3dAxisAlign
+from modules.Calc import bbox3d2bev, bbox3d2corner, classifyAnchors, classifyAnchorsAlignedGT, bbox3dAxisAlign
 from modules.data import Load as load, Preprocessing as pre
 from modules.augment.Augment import augmentTargetClasses
 from modules.augment.LoadGT import getAllGT
@@ -18,6 +18,9 @@ from torch.cuda.amp import autocast
 from torch import nn
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.nn.utils import clip_grad_norm_
+# from open3d.cuda.pybind.utility import Vector3dVector
+# from open3d.cuda.pybind.geometry import PointCloud, OrientedBoundingBox
+# from open3d.visualization import draw_geometries
 
 device = cfg.device
 if cfg.half:
@@ -32,7 +35,7 @@ if cfg.sparsemiddle:
 
 def initWeights(m):
     if isinstance(m, nn.Conv2d) and m.get_parameter('weight').requires_grad:
-        nn.init.kaiming_normal_(m.weight.data, mode = 'fan_out', nonlinearity = 'relu')
+        nn.init.kaiming_normal_(m.weight.data, mode = 'fan_in', nonlinearity = 'relu')
         m.bias.data.zero_()
     # elif isinstance(m, nn.Linear) and m.get_parameter('weight').requires_grad:
     #     nn.init.kaiming_normal_(m.weight.data, nonlinearity = 'relu')
@@ -99,7 +102,7 @@ def train(processPool):
     for p in opt.param_groups:
         p['initial_lr'] = 1e-4
         p['max_lr'] = 3e-3
-        p['min_lr'] = 1e-5
+        p['min_lr'] = 1e-6
     # torch.autograd.set_detect_anomaly(True)
 
     model = model.to(device)
@@ -118,8 +121,8 @@ def train(processPool):
 
     iterations = options.numepochs
     lastiter = options.lastiter
-    scheduler = OneCycleLR(opt, max_lr = 3e-3, div_factor = 30, final_div_factor = 10, epochs = 40, steps_per_epoch = 3712,
-                           last_epoch = lastiter * 3712 - 1, cycle_momentum = False, pct_start = 1.0 / 40.0)
+    scheduler = OneCycleLR(opt, max_lr = 3e-3, div_factor = 30, final_div_factor = 100, epochs = 60, steps_per_epoch = 3712,
+                           last_epoch = lastiter * 3712 - 1, cycle_momentum = False, pct_start = 3.0 / 60.0)
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
         opt.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}_opt.pkl'))
@@ -203,12 +206,12 @@ def train(processPool):
             if cfg.half:
                 scaler.scale(loss).backward()
                 scaler.unscale_(opt)
-                clip_grad_norm_(trainParams, 10)
+                clip_grad_norm_(trainParams, 35)
                 scaler.step(opt)
                 scaler.update()
             else:
                 loss.backward()
-                clip_grad_norm_(trainParams, 10)
+                clip_grad_norm_(trainParams, 35)
                 opt.step()
             ed = time.perf_counter()
             backwardTime += ed - st
@@ -221,19 +224,19 @@ def train(processPool):
                 print('lr =', scheduler.get_last_lr())
 
             print(f'\rEpoch{epoch + lastiter + 1} {i + 1}/{len(trainSet)}', end = ' ')
-            print(clsLoss.item(), regLoss.item(), dirLoss.item())
+            # print(clsLoss.item(), regLoss.item(), dirLoss.item())
             if (i + 1) % 50 == 0 or i + 1 == len(trainSet):
                 print()
-                print('Avg classfication loss: %.6f, Avg regression loss: %.6f, Avg direction loss: %.6f'
+                print('Avg classfication loss: %.7f, Avg regression loss: %.7f, Avg direction loss: %.7f'
                       % (clsLossSum / clsCnt, regLossSum / regCnt, dirLossSum / dirCnt))
-                print('Max classfication loss: %.6f, Max regression loss: %.6f, Max direction loss: %.6f'
+                print('Max classfication loss: %.7f, Max regression loss: %.7f, Max direction loss: %.7f'
                       % (maxClsLoss, maxRegLoss, maxDirLoss))
                 if i + 1 == len(trainSet):
                     with open('./checkpoints/log.txt', 'a+') as logf:
                         print(f'Epoch {epoch + lastiter + 1}:', file = logf)
-                        print('Avg classfication loss: %.6f, Avg regression loss: %.6f, Avg direction loss: %.6f'
+                        print('Avg classfication loss: %.7f, Avg regression loss: %.7f, Avg direction loss: %.7f'
                               % (clsLossSum / clsCnt, regLossSum / regCnt, dirLossSum / dirCnt), file = logf)
-                        print('Max classfication loss: %.6f, Max regression loss: %.6f, Max direction loss: %.6f'
+                        print('Max classfication loss: %.7f, Max regression loss: %.7f, Max direction loss: %.7f'
                               % (maxClsLoss, maxRegLoss, maxDirLoss), file = logf)
                 # print('Non-nan classfication loss:', clsCnt, 'None-nan regression loss:', regCnt)
 

@@ -105,7 +105,7 @@ auto bboxOverlap(array_t<float> bboxes1, array_t<float> bboxes2) {
         float area1 = area(r1, 4);
         for (pyint j = 0; j < (const pyint)bboxes2.shape(0); j++) {
             for (int k = 0; k < 4; k++) {
-                r2[j].x = _b2(j, k, 0), r2[j].y = _b2(j, k, 1);
+                r2[k].x = _b2(j, k, 0), r2[k].y = _b2(j, k, 1);
             }
             float area2 = area(r2, 4);
             float inter = intersectArea(r1, 4, r2, 4);
@@ -126,7 +126,7 @@ auto bboxIntersection(array_t<float> bboxes1, array_t<float> bboxes2) {
         }
         for (pyint j = 0; j < (const pyint)bboxes2.shape(0); j++) {
             for (int k = 0; k < 4; k++) {
-                r2[j].x = _b2(j, k, 0), r2[j].y = _b2(j, k, 1);
+                r2[k].x = _b2(j, k, 0), r2[k].y = _b2(j, k, 1);
             }
             float inter = intersectArea(r1, 4, r2, 4);
             _res(i, j) = inter;
