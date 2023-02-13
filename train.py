@@ -102,7 +102,7 @@ def train(processPool):
     for p in opt.param_groups:
         p['initial_lr'] = 1e-4
         p['max_lr'] = 3e-3
-        p['min_lr'] = 1e-6
+        p['min_lr'] = 1e-5
     # torch.autograd.set_detect_anomaly(True)
 
     model = model.to(device)
@@ -121,8 +121,8 @@ def train(processPool):
 
     iterations = options.numepochs
     lastiter = options.lastiter
-    scheduler = OneCycleLR(opt, max_lr = 3e-3, div_factor = 30, final_div_factor = 100, epochs = 60, steps_per_epoch = 3712,
-                           last_epoch = lastiter * 3712 - 1, cycle_momentum = False, pct_start = 3.0 / 60.0)
+    scheduler = OneCycleLR(opt, max_lr = 3e-3, div_factor = 30, final_div_factor = 10, epochs = 70, steps_per_epoch = 3712,
+                           last_epoch = lastiter * 3712 - 1, cycle_momentum = False, pct_start = 0.05)
     if lastiter > 0:
         model.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}.pkl'))
         opt.load_state_dict(torch.load(f'./checkpoints/epoch{lastiter}_opt.pkl'))
