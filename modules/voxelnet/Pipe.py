@@ -2,6 +2,7 @@ from torch import nn
 import torch
 # from modules.layers import FCRB, CRB2d, CRB3d, DeCRB2d
 from modules.layers import FCBR, CBR2d, CBR3d, DeCBR2d
+import modules.config as cfg
 
 class VFE(nn.Module):
 
@@ -22,7 +23,7 @@ class SVFE(nn.Module):
 
     def __init__(self, sampleNum = 35):
         super().__init__()
-        self.vfe1 = VFE(7 + 16, 16, sampleNum)
+        self.vfe1 = VFE(7, 16, sampleNum)
         self.vfe2 = VFE(32, 64, sampleNum)
 
     def forward(self, x):
@@ -33,11 +34,21 @@ class CML(nn.Module):
 
     def __init__(self):
         super().__init__()
-        self.conv1 = CBR3d(128, 64, 3, (2, 1, 1), (1, 1, 1))
-        self.conv2 = CBR3d(64, 64, 3, 1, (0, 1, 1))
-        self.conv3 = CBR3d(64, 64, 3, (2, 1, 1), 1)
+        self.downsample = self.downsampleLayers(cfg.voxelscale)
+        self.conv1 = CBR3d(128, 128, 3, (2, 1, 1), (1, 1, 1))
+        self.conv2 = CBR3d(128, 128, 3, 1, (0, 1, 1))
+        self.conv3 = CBR3d(128, 128, 3, (2, 1, 1), 1)
+
+    @staticmethod
+    def downsampleLayers(downscale: int):
+        if downscale <= 0:
+            return lambda x: x
+        else:
+            layers = [CBR3d(128, 128, 2, 2, 0) for _ in range(downscale)]
+            return nn.Sequential(*layers)
 
     def forward(self, x):
+        x = self.downsample(x)
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
@@ -50,15 +61,25 @@ try:
 
         def __init__(self):
             super().__init__()
-            self.subm1 = SparseCRB3d('subm', 128, 64, 3, 1, 1, bias = False)
-            self.conv1 = SparseCRB3d('sparse', 64, 64, (3, 1, 1), (2, 1, 1), (1, 0, 0), bias = False)
-            self.subm2 = SparseCRB3d('subm', 64, 64, 3, 1, 1, bias = False)
-            self.subm3 = SparseCRB3d('subm', 64, 64, 3, 1, 1, bias = False)
-            self.conv2 = SparseCRB3d('sparse', 64, 64, (3, 1, 1), (2, 1, 1), 0, bias = False)
+            self.downsample = self.downsampleLayers(cfg.voxelscale)
+            self.subm1 = SparseCRB3d('subm', 128, 128, 3, 1, 1, bias = False)
+            self.conv1 = SparseCRB3d('sparse', 128, 128, (3, 1, 1), (2, 1, 1), (1, 0, 0), bias = False)
+            self.subm2 = SparseCRB3d('subm', 128, 128, 3, 1, 1, bias = False)
+            self.subm3 = SparseCRB3d('subm', 128, 128, 3, 1, 1, bias = False)
+            self.conv2 = SparseCRB3d('sparse', 128, 128, (3, 1, 1), (2, 1, 1), 0, bias = False)
+
+        @staticmethod
+        def downsampleLayers(downscale: int):
+            if downscale <= 0:
+                return lambda x: x
+            else:
+                layers = [SparseCRB3d('sparse', 128, 128, 2, 2, 0, bias = False) for _ in range(downscale)]
+                return nn.Sequential(*layers)
 
         def forward(self, x):
             if not isinstance(x, spconv.SparseConvTensor):
                 x = spconv.SparseConvTensor.from_dense(x)
+            x = self.downsample(x)
             x = self.subm1(x)
             x = self.conv1(x)
             x = self.subm2(x)
@@ -74,23 +95,23 @@ class RPN(nn.Module):
     def __init__(self):
         super().__init__()
         self.blk1 = nn.Sequential(
-            CBR2d(128, 128, 3, 2, 1),
-            *[CBR2d(128, 128, 3, 1, 1) for _ in range(3)]
+            CBR2d(256, 256, 3, 2, 1),
+            *[CBR2d(256, 256, 3, 1, 1) for _ in range(2)]
         )
         self.blk2 = nn.Sequential(
-            CBR2d(128, 128, 3, 2, 1),
-            *[CBR2d(128, 128, 3, 1, 1) for _ in range(5)]
+            CBR2d(256, 256, 3, 2, 1),
+            *[CBR2d(256, 256, 3, 1, 1) for _ in range(4)]
         )
         self.blk3 = nn.Sequential(
-            CBR2d(128, 256, 3, 2, 1),
-            *[CBR2d(256, 256, 3, 1, 1) for _ in range(5)]
+            CBR2d(256, 512, 3, 2, 1),
+            *[CBR2d(512, 512, 3, 1, 1) for _ in range(4)]
         )
-        self.deconv1 = DeCBR2d(128, 256, 3, 1, 1)
-        self.deconv2 = DeCBR2d(128, 256, 2, 2, 0)
-        self.deconv3 = DeCBR2d(256, 256, 4, 4, 0)
-        self.cls = nn.Conv2d(768, 2, 1, 1, 0)
-        self.reg = nn.Conv2d(768, 14, 1, 1, 0)
-        self.dir = nn.Conv2d(768, 4, 1, 1, 0)
+        self.deconv1 = DeCBR2d(256, 512, 3, 1, 1)
+        self.deconv2 = DeCBR2d(256, 512, 2, 2, 0)
+        self.deconv3 = DeCBR2d(512, 512, 4, 4, 0)
+        self.cls = nn.Conv2d(1536, 2, 1, 1, 0)
+        self.reg = nn.Conv2d(1536, 14, 1, 1, 0)
+        self.dir = nn.Conv2d(1536, 4, 1, 1, 0)
 
     def forward(self, x):
         x1 = self.blk1(x)

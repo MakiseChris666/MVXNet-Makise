@@ -20,14 +20,14 @@ class VoxelNet(nn.Module):
         def reindex(x, idx):
             idx = idx[:, [0, 3, 1, 2]]
             idx = idx.int().contiguous()
-            res = spconv.SparseConvTensor(x, idx, [cfg.voxelshape[2], cfg.voxelshape[0], cfg.voxelshape[1]], 1)
+            res = spconv.SparseConvTensor(x, idx, [cfg.voxelshape[i] * cfg.voxelscale ** 2 for i in (2, 0, 1)], 1)
             return res
     else:
         @staticmethod
         def reindex(x, idx):
             # input shape: x = (batch * N, 128), idx = (batch * N, 1 + 3)
-            res = Variable(torch.zeros((1, 128, cfg.voxelshape[2], cfg.voxelshape[0]
-                                        , cfg.voxelshape[1]), dtype = cfg.dtype, device = cfg.device))
+            res = Variable(torch.zeros((1, 128, cfg.voxelshape[2] * cfg.voxelscale ** 2, cfg.voxelshape[0] * cfg.voxelscale ** 2
+                                        , cfg.voxelshape[1] * cfg.voxelscale ** 2), dtype = cfg.dtype, device = cfg.device))
             res[idx[:, 0], :, idx[:, 3], idx[:, 1], idx[:, 2]] = x
             return res
 

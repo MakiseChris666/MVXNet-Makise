@@ -1,5 +1,5 @@
 device: cuda
-half: False
+half: True
 sparsemiddle: True # Should install spconv package first
 augment: True
 velorange:
@@ -9,10 +9,12 @@ velorange:
   - 70.4
   - 40.0
   - 1.0
-voxelshape:
+voxelshape: # Don't modify this param but rather modify param 'voxelscale'
   - 352
   - 400
   - 10
+voxelscale: 2 # Integer. 'Voxelshape' param will be multiplied by this voxelscale ** 2,
+              # while Convolutional Middle Layers will downsample it to the original shape
 carsize: # it's a temp param, the model only supports detect cars currenly
   - 3.9
   - 1.6
@@ -20,7 +22,7 @@ carsize: # it's a temp param, the model only supports detect cars currenly
 batchsize: 1 # this param doesn't work because the model currenly supports only batchsize=1
 bnaffine: False # whether to use trainable BN layers
 bntrack: False # whether to update var and mean in BN
-samplenum: 35
+samplenum: 5
 numthreads: 8
 multiprocess: 0
 imsize:

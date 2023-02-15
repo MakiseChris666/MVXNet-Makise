@@ -7,11 +7,12 @@ from torchvision.ops.focal_loss import sigmoid_focal_loss
 
 class VoxelLoss(nn.Module):
 
-    def __init__(self, eps = cfg.eps, lossWeights = (1.0, 2.0, 0.2)):
+    def __init__(self, beta = 0.4, eps = cfg.eps, lossWeights = (1.0, 2.0, 0.2)):
         super().__init__()
         self.eps = eps
         self.lossWeights = lossWeights
-        self.smoothl1 = SmoothL1Loss(beta = 1.0 / 9.0)
+        self.smoothl1 = SmoothL1Loss(beta = beta, reduction = 'sum')
+        self.angleloss = lambda x: torch.where(x < beta, 0.5 * x ** 2 / beta, x - 0.5 * beta).sum()
         self.entropy = CrossEntropyLoss()
 
     def forward(self, pi, ni, gi, gts, score, reg, dir, anchors, anchorsPerLoc):
@@ -26,7 +27,7 @@ class VoxelLoss(nn.Module):
         valid[ni] = 0
         valid[pi] = 1
         clsLoss = clsLoss * valid
-        clsLoss = clsLoss.sum() / (score.shape.numel() - ni[0].shape[0] + pi[0].shape[0])
+        clsLoss = clsLoss.sum() / max(1, pi[0].shape[0])
 
         # score = torch.sigmoid(score)
         # posLoss = -(torch.log(score[pi] + self.eps) * (1 - score[pi]) ** 2).sum()
@@ -52,9 +53,8 @@ class VoxelLoss(nn.Module):
         dirpos = alignedGTs[:, 6] > 0
 
         reg = reg.reshape((reg.shape[0], reg.shape[1], anchorsPerLoc, 7))[pi]
-        regLoss = self.smoothl1(reg[:, :6], targets) + \
-                  self.smoothl1(torch.sin(reg[:, 6] - alignedGTs[:, 6]),
-                                torch.zeros(reg.shape[0], dtype = cfg.dtype, device = cfg.device))
+        regLoss = (self.smoothl1(reg[:, :6], targets) +
+                  self.angleloss(torch.sin(reg[:, 6] - alignedGTs[:, 6]))) / pi[0].shape[0]
 
         dir = dir[pi]
         dirTar = torch.zeros_like(dir, dtype = cfg.dtype, device = cfg.device)

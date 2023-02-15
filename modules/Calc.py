@@ -277,5 +277,5 @@ def decodeRegression(regmap: torch.Tensor, anchors: torch.Tensor) -> torch.Tenso
     res[..., :2] = regmap[..., :2] * d + anchors[..., :2]
     res[..., 2] = regmap[..., 2] * anchors[..., 5] + anchors[..., 2]
     res[..., 3:6] = torch.exp(regmap[..., 3:6]) * anchors[..., 3:6]
-    res[..., 6] = torch.arcsin(regmap[..., 6]) + anchors[..., 6]
+    # res[..., 6] = torch.arcsin(regmap[..., 6])
     return res

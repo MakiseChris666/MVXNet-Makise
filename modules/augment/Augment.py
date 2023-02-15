@@ -10,7 +10,7 @@ from torchvision.ops.boxes import box_area
 import cv2 as cv
 
 @njit
-def check(pcd: np.ndarray, velorange: List[float], gridshape: Tuple[int, int] = (704, 800)):
+def check(pcd: np.ndarray, velorange: List[float], gridshape: Tuple[int, int] = (88, 100)):
     # velorange = np.array(velorange)
     low = np.array(velorange[:2])
     gridsize = np.array([(velorange[3] - velorange[0]) / gridshape[0], (velorange[4] - velorange[1]) / gridshape[1]])
@@ -34,7 +34,7 @@ def locate(scenepcd, scenebevs, scenebbox2ds, scenebbox3ds, gts, iterlim = 30):
         gtbbox2d = gt['bbox2d']
 
         gtx, gty = gtbbox3d[:2]
-        gridx, gridy = (gtx - lowx) / 0.1, (gty - lowy) / 0.1
+        gridx, gridy = (gtx - lowx) / 0.8, (gty - lowy) / 0.8
         gridx, gridy = int(gridx), int(gridy)
         zground = zmax[gridx, gridy]
         if zground > gtbbox3d[2] + 0.1:

@@ -35,7 +35,7 @@ if cfg.sparsemiddle:
 
 def initWeights(m):
     if isinstance(m, nn.Conv2d) and m.get_parameter('weight').requires_grad:
-        nn.init.kaiming_normal_(m.weight.data, mode = 'fan_in', nonlinearity = 'relu')
+        nn.init.kaiming_normal_(m.weight.data, mode = 'fan_out', nonlinearity = 'relu')
         m.bias.data.zero_()
     # elif isinstance(m, nn.Linear) and m.get_parameter('weight').requires_grad:
     #     nn.init.kaiming_normal_(m.weight.data, nonlinearity = 'relu')
@@ -97,8 +97,8 @@ def train(processPool):
     model.head.fusion.apply(initWeights)
     criterion = VoxelLoss()
     trainParams = filter(lambda p: p.requires_grad, model.parameters())
-    opt = torch.optim.AdamW(trainParams, betas = (0.95, 0.99), eps = 1e-3 if cfg.half else 1e-8,
-                            lr = 1e-3, weight_decay = 0.01)
+    opt = torch.optim.AdamW(trainParams, eps = 1e-3 if cfg.half else 1e-8,
+                            lr = 1e-3, weight_decay = 0.001)
     for p in opt.param_groups:
         p['initial_lr'] = 1e-4
         p['max_lr'] = 3e-3
